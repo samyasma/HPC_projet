@@ -1,4 +1,4 @@
-/* 
+/*
  * Sequential implementation of the Conjugate Gradient Method.
  *
  * Authors : Lilia Ziane Khodja & Charles Bouillaguet
@@ -8,8 +8,8 @@
  * CHANGE LOG:
  *    v1.01 : fix a minor printing bug in load_mm (incorrect CSR matrix size)
  *    v1.02 : use https instead of http in "PRO-TIP"
- *  
- * USAGE: 
+ *
+ * USAGE:
  * 	$ ./cg --matrix bcsstk13.mtx                # loading matrix from file
  *      $ ./cg --matrix bcsstk13.mtx > /dev/null    # ignoring solution
  *	$ ./cg < bcsstk13.mtx > /dev/null           # loading matrix from stdin
@@ -27,7 +27,7 @@
 #include <math.h>
 #include <getopt.h>
 #include <sys/time.h>
-
+#include <mpi.h>
 #include "mmio.h"
 
 #define THRESHOLD 1e-8		// maximum tolerance threshold
@@ -109,7 +109,7 @@ struct csr_matrix_t *load_mm(FILE * f)
 		/*
 		 * Uncomment this to check input (but it slows reading)
 		 * if (i < 1 || i > n || j < 1 || j > i)
-		 *	errx(2, "invalid entry %d : %d %d\n", u, i, j); 
+		 *	errx(2, "invalid entry %d : %d %d\n", u, i, j);
 		 */
 		Tx[u] = x;
 	}
@@ -219,6 +219,31 @@ void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y)
 	}
 }
 
+void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my_rank, int total)
+{
+	int n = A->n;
+	int *Ap = A->Ap;
+	int *Aj = A->Aj;
+	double *Ax = A->Ax;
+
+	int debut = (my_rank*n)/total;
+	int fin= ((my_rank+1)*n)/total;
+	double temp=malloc((fin-debut)*sizeof(double))
+	for (int i = debut; i < fin; i++) {
+		temp[i-debut] = 0;
+		for (int u = Ap[i]; u < Ap[i + 1]; u++) {
+			int j = Aj[u];
+			double A_ij = Ax[u];
+			temp[i-debut] += A_ij * x[j];
+		}
+	}
+
+	MPI_Allgather(temp,fin-debut,MPI_DOUBLE,y,n/total,MPI_DOUBLE,MPI_COMM_WORLD)
+
+}
+
+
+
 /*************************** Vector operations ********************************/
 
 /* dot product */
@@ -230,24 +255,49 @@ double dot(const int n, const double *x, const double *y)
 	return sum;
 }
 
+double dot_mpi(const int n, const double *x, const double *y,int my_rank,int total)
+{
+	double sum = 0.0;
+	int debut = (my_rank*n)/total;
+	int fin= ((my_rank+1)*n)/total;
+	double temp=0.0
+	for (int i = debut; i < fin; i++){
+		temp += x[i] * y[i];
+	}
+	MPI_Allreduce(&temp,&sum,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD)
+	return sum;
+}
+
+
 /* euclidean norm (a.k.a 2-norm) */
 double norm(const int n, const double *x)
 {
 	return sqrt(dot(n, x, x));
 }
 
-/*********************** conjugate gradient algorithm *************************/
+double norm(const int n, const double *x,int my_rank,int total)
+{
+	return sqrt(dot_mpi(n, x, x, my_rank,total));
+}
+
+
+/***********************  *************************/
 
 /* Solve Ax == b (the solution is written in x). Scratch must be preallocated of size 6n */
-void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const double epsilon, double *scratch)
+void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, const double epsilon, double *scratch,int myrank, int total)
 {
 	int n = A->n;
 	int nz = A->nz;
-
+	if(my_rank==0){
 	fprintf(stderr, "[CG] Starting iterative solver\n");
 	fprintf(stderr, "     ---> Working set : %.1fMbyte\n", 1e-6 * (12.0 * nz + 52.0 * n));
 	fprintf(stderr, "     ---> Per iteration: %.2g FLOP in sp_gemv() and %.2g FLOP in the rest\n", 2. * nz, 12. * n);
-
+	}
+	//if(myrank==0){
+	//	MPI_Bcast(&b,n,MPI_INT,0,MPI_COMM_WORLD); ////Envoie de b à tout les processus par le root
+	//	MPI_Bcast(&x,n,MPI_INT,0,MPI_COMM_WORLD); /// Envoie de x à tout les processus par le root
+	//}
+	//MPI_Scatter()
 	double *r = scratch;	        // residue
 	double *z = scratch + n;	// preconditioned-residue
 	double *p = scratch + 2 * n;	// search direction
@@ -257,7 +307,78 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
 	/* Isolate diagonal */
 	extract_diagonal(A, d);
 
-	/* 
+	/*
+	 * This function follows closely the pseudo-code given in the (english)
+	 * Wikipedia page "Conjugate gradient method". This is the version with
+	 * preconditionning.
+	 */
+
+	/* We use x == 0 --- this avoids the first matrix-vector product. */
+	for (int i = 0; i < n; i++)
+		x[i] = 0.0;
+	for (int i = 0; i < n; i++)	// r <-- b - Ax == b
+		r[i] = b[i];
+	for (int i = 0; i < n; i++)	// z <-- M^(-1).r
+		z[i] = r[i] / d[i];
+	for (int i = 0; i < n; i++)	// p <-- z
+		p[i] = z[i];
+
+	double rz = dot_mpi(n, r, z,my_rank,total);
+	double start = wtime();
+	double last_display = start;
+	int iter = 0;
+	while (norm_mpi(n, r,my_rank,total) > epsilon) {
+		/* loop invariant : rz = dot(r, z) */
+		double old_rz = rz;
+		sp_gemv_mpi(A, p, q,my_rank,total);	/* q <-- A.p */
+		double alpha = old_rz / dot_mpi(n, p, q,my_rank,total);
+		for (int i = 0; i < n; i++)	// x <-- x + alpha*p
+			x[i] += alpha * p[i];
+		for (int i = 0; i < n; i++)	// r <-- r - alpha*q
+			r[i] -= alpha * q[i];
+		for (int i = 0; i < n; i++)	// z <-- M^(-1).r
+			z[ i] = r[i] / d[i];
+		rz = dot_mpi(n, r, z,my_rank,total);	// restore invariant
+		double beta = rz / old_rz;
+		for (int i = 0; i < n; i++)	// p <-- z + beta*p
+			p[i] = z[i] + beta * p[i];
+		iter++;
+		double t = wtime();
+		if (t - last_display > 0.5) {
+			/* verbosity */
+			double rate = iter / (t - start);	// iterations per s.
+			double GFLOPs = 1e-9 * rate * (2 * nz + 12 * n);
+			fprintf(stderr, "\r     ---> error : %2.2e, iter : %d (%.1f it/s, %.2f GFLOPs)", norm(n, r), iter, rate, GFLOPs);
+			fflush(stdout);
+			last_display = t;
+		}
+	}
+	fprintf(stderr, "\n     ---> Finished in %.1fs and %d iterations\n", wtime() - start, iter);
+}
+
+void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const double epsilon, double *scratch,int myrank)
+{
+	int n = A->n;
+	int nz = A->nz;
+
+	fprintf(stderr, "[CG] Starting iterative solver\n");
+	fprintf(stderr, "     ---> Working set : %.1fMbyte\n", 1e-6 * (12.0 * nz + 52.0 * n));
+	fprintf(stderr, "     ---> Per iteration: %.2g FLOP in sp_gemv() and %.2g FLOP in the rest\n", 2. * nz, 12. * n);
+	//if(myrank==0){
+	//	MPI_Bcast(&b,n,MPI_INT,0,MPI_COMM_WORLD); ////Envoie de b à tout les processus par le root
+	//	MPI_Bcast(&x,n,MPI_INT,0,MPI_COMM_WORLD); /// Envoie de x à tout les processus par le root
+	//}
+	//MPI_Scatter()
+	double *r = scratch;	        // residue
+	double *z = scratch + n;	// preconditioned-residue
+	double *p = scratch + 2 * n;	// search direction
+	double *q = scratch + 3 * n;	// q == Ap
+	double *d = scratch + 4 * n;	// diagonal entries of A (Jacobi preconditioning)
+
+	/* Isolate diagonal */
+	extract_diagonal(A, d);
+
+	/*
 	 * This function follows closely the pseudo-code given in the (english)
 	 * Wikipedia page "Conjugate gradient method". This is the version with
 	 * preconditionning.
@@ -287,7 +408,7 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
 		for (int i = 0; i < n; i++)	// r <-- r - alpha*q
 			r[i] -= alpha * q[i];
 		for (int i = 0; i < n; i++)	// z <-- M^(-1).r
-			z[i] = r[i] / d[i];
+			z[ i] = r[i] / d[i];
 		rz = dot(n, r, z);	// restore invariant
 		double beta = rz / old_rz;
 		for (int i = 0; i < n; i++)	// p <-- z + beta*p
@@ -306,6 +427,9 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
 	fprintf(stderr, "\n     ---> Finished in %.1fs and %d iterations\n", wtime() - start, iter);
 }
 
+
+
+
 /******************************* main program *********************************/
 
 /* options descriptor */
@@ -320,6 +444,19 @@ struct option longopts[6] = {
 
 int main(int argc, char **argv)
 {
+	/* Initializing MPI */
+	int my_rank, total, source, dest, tag = 0;
+    MPI_Status status;
+    char hostname[SIZE_H_N];
+    gethostname(hostname,SIZE_H_N);
+
+    //initialisation
+
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD,&my_rank);
+    MPI_Comm_size(MPI_COMM_WORLD,&total);
+
+
 	/* Parse command-line options */
 	long long seed = 0;
 	char *rhs_filename = NULL;
@@ -384,9 +521,10 @@ int main(int argc, char **argv)
 	}
 
 	/* solve Ax == b */
-	cg_solve(A, b, x, THRESHOLD, scratch);
+	cg_solve_mpi(A, b, x, THRESHOLD, scratch,my_rank,total);
 
 	/* Check result */
+	if(my_rank==0){
 	if (safety_check) {
 		double *y = scratch;
 		sp_gemv(A, x, y);	// y = Ax
@@ -403,7 +541,10 @@ int main(int argc, char **argv)
 			err(1, "cannot open solution file %s", solution_filename);
 		fprintf(stderr, "[IO] writing solution to %s\n", solution_filename);
 	}
+
 	for (int i = 0; i < n; i++)
 		fprintf(f_x, "%a\n", x[i]);
+	}
+	MPI_Finalize()
 	return EXIT_SUCCESS;
 }
