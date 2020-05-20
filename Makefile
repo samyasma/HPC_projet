@@ -1,5 +1,5 @@
 # your choice of compiler
-CC = gcc
+CC = mpicc
 
 # Add your choice of flags
 CFLAGS = -O3 -Wall -Wextra -g

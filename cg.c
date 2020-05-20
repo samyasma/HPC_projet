@@ -29,7 +29,7 @@
 #include <sys/time.h>
 #include <mpi.h>
 #include "mmio.h"
-
+#define SIZE_H_N 50
 #define THRESHOLD 1e-8		// maximum tolerance threshold
 
 struct csr_matrix_t {
@@ -228,7 +228,7 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my
 
 	int debut = (my_rank*n)/total;
 	int fin= ((my_rank+1)*n)/total;
-	double temp=malloc((fin-debut)*sizeof(double))
+	double *temp=malloc((fin-debut)*sizeof(double));
 	for (int i = debut; i < fin; i++) {
 		temp[i-debut] = 0;
 		for (int u = Ap[i]; u < Ap[i + 1]; u++) {
@@ -238,7 +238,7 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my
 		}
 	}
 
-	MPI_Allgather(temp,fin-debut,MPI_DOUBLE,y,n/total,MPI_DOUBLE,MPI_COMM_WORLD)
+	MPI_Allgather(temp,fin-debut,MPI_DOUBLE,y,n/total,MPI_DOUBLE,MPI_COMM_WORLD);
 
 }
 
@@ -260,11 +260,11 @@ double dot_mpi(const int n, const double *x, const double *y,int my_rank,int tot
 	double sum = 0.0;
 	int debut = (my_rank*n)/total;
 	int fin= ((my_rank+1)*n)/total;
-	double temp=0.0
+	double temp=0.0;
 	for (int i = debut; i < fin; i++){
 		temp += x[i] * y[i];
 	}
-	MPI_Allreduce(&temp,&sum,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD)
+	MPI_Allreduce(&temp,&sum,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 	return sum;
 }
 
@@ -275,7 +275,7 @@ double norm(const int n, const double *x)
 	return sqrt(dot(n, x, x));
 }
 
-double norm(const int n, const double *x,int my_rank,int total)
+double norm_mpi(const int n, const double *x,int my_rank,int total)
 {
 	return sqrt(dot_mpi(n, x, x, my_rank,total));
 }
@@ -284,7 +284,7 @@ double norm(const int n, const double *x,int my_rank,int total)
 /***********************  *************************/
 
 /* Solve Ax == b (the solution is written in x). Scratch must be preallocated of size 6n */
-void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, const double epsilon, double *scratch,int myrank, int total)
+void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, const double epsilon, double *scratch,int my_rank, int total)
 {
 	int n = A->n;
 	int nz = A->nz;
@@ -446,9 +446,6 @@ int main(int argc, char **argv)
 {
 	/* Initializing MPI */
 	int my_rank, total, source, dest, tag = 0;
-    MPI_Status status;
-    char hostname[SIZE_H_N];
-    gethostname(hostname,SIZE_H_N);
 
     //initialisation
 
@@ -545,6 +542,6 @@ int main(int argc, char **argv)
 	for (int i = 0; i < n; i++)
 		fprintf(f_x, "%a\n", x[i]);
 	}
-	MPI_Finalize()
+	MPI_Finalize();
 	return EXIT_SUCCESS;
 }
