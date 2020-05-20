@@ -244,10 +244,10 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my
 		starts[i] = i*n/total;
 		// fprintf(stderr,"%d : sizes = %d et starts = %d\n",i,sizes[i],starts[i]);
 	}
-	fprintf(stderr,"blabla\n");
+	
 	//MPI_Allgather(temp,fin-debut,MPI_DOUBLE,y,n/total,MPI_DOUBLE,MPI_COMM_WORLD);
 	MPI_Allgatherv(temp,fin-debut , MPI_DOUBLE,y,sizes,starts , MPI_DOUBLE, MPI_COMM_WORLD);
-	fprintf(stderr,"ca passe\n");
+	
 }
 
 
