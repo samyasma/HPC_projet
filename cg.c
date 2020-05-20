@@ -228,7 +228,7 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my
 
 	int debut = (my_rank*n)/total;
 	int fin= ((my_rank+1)*n)/total;
-	double *temp=malloc((fin-debut)*sizeof(double));
+	double *temp=malloc(8*(fin-debut)*sizeof(double));
 	for (int i = debut; i < fin; i++) {
 		temp[i-debut] = 0;
 		for (int u = Ap[i]; u < Ap[i + 1]; u++) {
@@ -237,8 +237,9 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my
 			temp[i-debut] += A_ij * x[j];
 		}
 	}
-
+	fprintf(stderr,"blabla\n");
 	MPI_Allgather(temp,fin-debut,MPI_DOUBLE,y,n/total,MPI_DOUBLE,MPI_COMM_WORLD);
+	fprintf(stderr,"ca passe\n");
 
 }
 
