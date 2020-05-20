@@ -237,8 +237,8 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my
 			temp[i-debut] += A_ij * x[j];
 		}
 	}
-	int *sizes = (int *)malloc(np*sizeof(int)); // Tailles des tableaux envoyés
-	int *starts = (int *)malloc(np*sizeof(int)); // Adresses dans le y
+	int *sizes = (int *)malloc(total*sizeof(int)); // Tailles des tableaux envoyés
+	int *starts = (int *)malloc(total*sizeof(int)); // Adresses dans le y
 	for(int i = 0 ; i < total ; i++){
 		sizes[i] = (i+1)*n/total - i*n/total;
 		starts[i] = i*n/total;
