@@ -237,17 +237,17 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my
 			temp[i-debut] += A_ij * x[j];
 		}
 	}
-	int *sizes = (int *)malloc(total*sizeof(int)); // Tailles des tableaux envoyés
-	int *starts = (int *)malloc(total*sizeof(int)); // Adresses dans le y
+	int *taille = (int *)malloc(total*sizeof(int)); // Tailles des tableaux envoyés
+	int *debuts = (int *)malloc(total*sizeof(int)); // Adresses dans le y
 	for(int i = 0 ; i < total ; i++){
-		sizes[i] = (i+1)*n/total - i*n/total;
+		sizes[i] = n/total ;
 		starts[i] = i*n/total;
 		// fprintf(stderr,"%d : sizes = %d et starts = %d\n",i,sizes[i],starts[i]);
 	}
-	
+
 	//MPI_Allgather(temp,fin-debut,MPI_DOUBLE,y,n/total,MPI_DOUBLE,MPI_COMM_WORLD);
-	MPI_Allgatherv(temp,fin-debut , MPI_DOUBLE,y,sizes,starts , MPI_DOUBLE, MPI_COMM_WORLD);
-	
+	MPI_Allgatherv(temp,fin-debut , MPI_DOUBLE,y,taille,debuts , MPI_DOUBLE, MPI_COMM_WORLD);
+
 }
 
 
