@@ -296,20 +296,9 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 {
 	int n = A->n; /// length of matrix
 	int nz = A->nz; //number of non zeros
-	int *row_ptr=A->*Ap; // row indices
-	int *indice_col=A->*Aj; // column indices
-
-	vSize = ceil((double)n / total); //partial vector size for each
-		vSize2 = nrows - (num_procs-1)*vSize;    //vector size for last process
-		if (vSize2 < 0) { //Error case
-			printf("Invalid num processors, exiting..\n");
-			exit(0);
-		}
-		if (myid == num_procs-1) {
-			vSize = vSize2;
-		}
-
-
+	int *row_ptr=A->Ap; // row indices
+	int *indice_col=A->Aj; // column indices
+	double *valeur_mat=A->Ax; //coefficient
 
 	if(my_rank==0){
 	fprintf(stderr, "[CG] Starting iterative solver\n");
@@ -318,14 +307,70 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	}
 
 
-	int nbr_rows=n/total;
 
-	MPI_Scatter(row_ptr+1,(myrank)*(n/total),MPI_INT,)
-	MPI_Bcast(&b,n,MPI_INT,0,MPI_COMM_WORLD); ////Envoie de b à tout les processus par le root
-	MPI_Bcast(&x,n,MPI_INT,0,MPI_COMM_WORLD); /// Envoie de x à tout les processus par le root
+	/////////////////ETAPE 1////
+	////DISTRIBUTION DES VECTEURS////
+	int vSize = ceil((double)n / total); //partial vector size for each
+	int vSize2 = n - (total-1)*vSize;    //vector size for last process
+	if (vSize2 < 0) { //Error case
+		printf("Invalid num processors, exiting..\n");
+		exit(0);
+	}
+	if (my_rank == total-1) {
+		vSize = vSize2;
+	}
+
+	// Vector size and displacement for each processor
+	int taille_x_local[total],taille_b_local[total], deplac_x_local[total],deplac_b_local[total];
+		for (int p = 0; p < total-1; p++) {
+			taille_x_local[p] = vSize;
+			deplac_x_local[p] = p*vSize;
+			taille_b_local[p] = vSize;
+			deplac_b_local[p] = p*vSize;
+		}
+		taille_x_local[total-1] = vSize2;
+		deplac_x_local[total-1] = (total-1)*vSize;
+		taille_b_local[total-1] = vSize2;
+		deplac_b_local[total-1] = (total-1)*vSize;
+	// Prepare to store local vector entries
+	double *b_local = (double *)malloc(sizeof(double) * vSize);
+	double *x_local = (double *)malloc(sizeof(double) * vSize);
+	// Scatter vector entries to each processor
+	MPI_Bcast(&n,1,MPI_INT,0,MPI_COMM_WORLD);
+	//pour x
+	MPI_Scatterv(x,taille_x_local,deplac_x_local,MPI_DOUBLE,x_local,vSize,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	//pour b
+	MPI_Scatterv(b,taille_b_local,deplac_b_local,MPI_DOUBLE,b_local,vSize,MPI_DOUBLE,0,MPI_COMM_WORLD);
 
 
-	//MPI_Scatter()
+	////// Pour la matrice
+	int taille_mat[total]; int depla_mat[total];
+		for (int p = 0; p < total; p++) {
+			taille_mat[p] = row_ptr[p*vSize+deplac_x_local[p]] - row_ptr[p*vSize];
+			depla_mat[p] = row_ptr[p*vSize];
+		}
+
+	//////////ENVOIE AUX AUTRES
+	int myNumE;
+	MPI_Scatter(taille_mat,1,MPI_INT,&myNumE,1,MPI_INT,0,MPI_COMM_WORLD);
+
+	int *rowptr_local = (int *)malloc(sizeof(int) * (vSize+1));
+	MPI_Scatterv(row_ptr,taille_x_local,deplac_x_local,MPI_INT,
+		rowptr_local,vSize,MPI_INT,0,MPI_COMM_WORLD);
+	rowptr_local[vSize] = myNumE;
+
+	int *col_local = (int *)malloc(sizeof(int) * myNumE);
+	MPI_Scatterv(indice_col,taille_mat,depla_mat,MPI_INT,
+			col_local,myNumE,MPI_INT,0,MPI_COMM_WORLD);
+
+	double *mat_val_local = (double *)malloc(sizeof(double) * myNumE);
+	MPI_Scatterv(valeur_mat,taille_mat,depla_mat,MPI_DOUBLE,
+	mat_val_local,myNumE,MPI_DOUBLE,0,MPI_COMM_WORLD);
+
+
+
+
+	////////////RESTE DU CODE
 	double *r = scratch;	        // residue
 	double *z = scratch + n;	// preconditioned-residue
 	double *p = scratch + 2 * n;	// search direction
