@@ -244,10 +244,10 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my
 		starts[i] = i*n/total;
 		// fprintf(stderr,"%d : sizes = %d et starts = %d\n",i,sizes[i],starts[i]);
 	}
-	
+
 	//MPI_Allgather(temp,fin-debut,MPI_DOUBLE,y,n/total,MPI_DOUBLE,MPI_COMM_WORLD);
 	MPI_Allgatherv(temp,fin-debut , MPI_DOUBLE,y,sizes,starts , MPI_DOUBLE, MPI_COMM_WORLD);
-	
+
 }
 
 
@@ -294,17 +294,37 @@ double norm_mpi(const int n, const double *x,int my_rank,int total)
 /* Solve Ax == b (the solution is written in x). Scratch must be preallocated of size 6n */
 void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, const double epsilon, double *scratch,int my_rank, int total)
 {
-	int n = A->n;
-	int nz = A->nz;
+	int n = A->n; /// length of matrix
+	int nz = A->nz; //number of non zeros
+	int *row_ptr=A->*Ap; // row indices
+	int *indice_col=A->*Aj; // column indices
+
+	vSize = ceil((double)n / total); //partial vector size for each
+		vSize2 = nrows - (num_procs-1)*vSize;    //vector size for last process
+		if (vSize2 < 0) { //Error case
+			printf("Invalid num processors, exiting..\n");
+			exit(0);
+		}
+		if (myid == num_procs-1) {
+			vSize = vSize2;
+		}
+
+
+
 	if(my_rank==0){
 	fprintf(stderr, "[CG] Starting iterative solver\n");
 	fprintf(stderr, "     ---> Working set : %.1fMbyte\n", 1e-6 * (12.0 * nz + 52.0 * n));
 	fprintf(stderr, "     ---> Per iteration: %.2g FLOP in sp_gemv() and %.2g FLOP in the rest\n", 2. * nz, 12. * n);
 	}
-	//if(myrank==0){
-	//	MPI_Bcast(&b,n,MPI_INT,0,MPI_COMM_WORLD); ////Envoie de b à tout les processus par le root
-	//	MPI_Bcast(&x,n,MPI_INT,0,MPI_COMM_WORLD); /// Envoie de x à tout les processus par le root
-	//}
+
+
+	int nbr_rows=n/total;
+
+	MPI_Scatter(row_ptr+1,(myrank)*(n/total),MPI_INT,)
+	MPI_Bcast(&b,n,MPI_INT,0,MPI_COMM_WORLD); ////Envoie de b à tout les processus par le root
+	MPI_Bcast(&x,n,MPI_INT,0,MPI_COMM_WORLD); /// Envoie de x à tout les processus par le root
+
+
 	//MPI_Scatter()
 	double *r = scratch;	        // residue
 	double *z = scratch + n;	// preconditioned-residue
@@ -363,78 +383,6 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	}
 	fprintf(stderr, "\n     ---> Finished in %.1fs and %d iterations\n", wtime() - start, iter);
 }
-
-void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const double epsilon, double *scratch,int myrank)
-{
-	int n = A->n;
-	int nz = A->nz;
-
-	fprintf(stderr, "[CG] Starting iterative solver\n");
-	fprintf(stderr, "     ---> Working set : %.1fMbyte\n", 1e-6 * (12.0 * nz + 52.0 * n));
-	fprintf(stderr, "     ---> Per iteration: %.2g FLOP in sp_gemv() and %.2g FLOP in the rest\n", 2. * nz, 12. * n);
-	//if(myrank==0){
-	//	MPI_Bcast(&b,n,MPI_INT,0,MPI_COMM_WORLD); ////Envoie de b à tout les processus par le root
-	//	MPI_Bcast(&x,n,MPI_INT,0,MPI_COMM_WORLD); /// Envoie de x à tout les processus par le root
-	//}
-	//MPI_Scatter()
-	double *r = scratch;	        // residue
-	double *z = scratch + n;	// preconditioned-residue
-	double *p = scratch + 2 * n;	// search direction
-	double *q = scratch + 3 * n;	// q == Ap
-	double *d = scratch + 4 * n;	// diagonal entries of A (Jacobi preconditioning)
-
-	/* Isolate diagonal */
-	extract_diagonal(A, d);
-
-	/*
-	 * This function follows closely the pseudo-code given in the (english)
-	 * Wikipedia page "Conjugate gradient method". This is the version with
-	 * preconditionning.
-	 */
-
-	/* We use x == 0 --- this avoids the first matrix-vector product. */
-	for (int i = 0; i < n; i++)
-		x[i] = 0.0;
-	for (int i = 0; i < n; i++)	// r <-- b - Ax == b
-		r[i] = b[i];
-	for (int i = 0; i < n; i++)	// z <-- M^(-1).r
-		z[i] = r[i] / d[i];
-	for (int i = 0; i < n; i++)	// p <-- z
-		p[i] = z[i];
-
-	double rz = dot(n, r, z);
-	double start = wtime();
-	double last_display = start;
-	int iter = 0;
-	while (norm(n, r) > epsilon) {
-		/* loop invariant : rz = dot(r, z) */
-		double old_rz = rz;
-		sp_gemv(A, p, q);	/* q <-- A.p */
-		double alpha = old_rz / dot(n, p, q);
-		for (int i = 0; i < n; i++)	// x <-- x + alpha*p
-			x[i] += alpha * p[i];
-		for (int i = 0; i < n; i++)	// r <-- r - alpha*q
-			r[i] -= alpha * q[i];
-		for (int i = 0; i < n; i++)	// z <-- M^(-1).r
-			z[ i] = r[i] / d[i];
-		rz = dot(n, r, z);	// restore invariant
-		double beta = rz / old_rz;
-		for (int i = 0; i < n; i++)	// p <-- z + beta*p
-			p[i] = z[i] + beta * p[i];
-		iter++;
-		double t = wtime();
-		if (t - last_display > 0.5) {
-			/* verbosity */
-			double rate = iter / (t - start);	// iterations per s.
-			double GFLOPs = 1e-9 * rate * (2 * nz + 12 * n);
-			fprintf(stderr, "\r     ---> error : %2.2e, iter : %d (%.1f it/s, %.2f GFLOPs)", norm(n, r), iter, rate, GFLOPs);
-			fflush(stdout);
-			last_display = t;
-		}
-	}
-	fprintf(stderr, "\n     ---> Finished in %.1fs and %d iterations\n", wtime() - start, iter);
-}
-
 
 
 

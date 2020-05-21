@@ -7,7 +7,7 @@ import textwrap
 import tempfile
 import base64
 
-VERSION = 2
+VERSION = 3
 PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----
 MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAEV5VrPiQFZw0jfzSNthKSXykClAuMRCKr
 VUGvo8B7DfsjOHwB8NmVamu6Tc2jpPs4ADAUfKZhGZPOKVJlKXEvjw==
