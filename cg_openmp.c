@@ -1,4 +1,4 @@
-/* 
+/*
  * Sequential implementation of the Conjugate Gradient Method.
  *
  * Authors : Lilia Ziane Khodja & Charles Bouillaguet
@@ -8,8 +8,8 @@
  * CHANGE LOG:
  *    v1.01 : fix a minor printing bug in load_mm (incorrect CSR matrix size)
  *    v1.02 : use https instead of http in "PRO-TIP"
- *  
- * USAGE: 
+ *
+ * USAGE:
  * 	$ ./cg --matrix bcsstk13.mtx                # loading matrix from file
  *      $ ./cg --matrix bcsstk13.mtx > /dev/null    # ignoring solution
  *	$ ./cg < bcsstk13.mtx > /dev/null           # loading matrix from stdin
@@ -37,7 +37,7 @@
 
 #define THRESHOLD 1e-8		// maximum tolerance threshold
 
-int nbth = 1 ; // Number of thread 
+int nbth = 1 ; // Number of thread
 
 struct csr_matrix_t {
 	int n;			// dimension
@@ -117,7 +117,7 @@ struct csr_matrix_t *load_mm(FILE * f)
 		/*
 		 * Uncomment this to check input (but it slows reading)
 		 * if (i < 1 || i > n || j < 1 || j > i)
-		 *	errx(2, "invalid entry %d : %d %d\n", u, i, j); 
+		 *	errx(2, "invalid entry %d : %d %d\n", u, i, j);
 		 */
 		Tx[u] = x;
 	}
@@ -145,9 +145,9 @@ struct csr_matrix_t *load_mm(FILE * f)
 
 	for (int i = 0; i < n; i++)
 		w[i] = 0;
-	
+
 	//{
-	
+
 	for (int u = 0; u < nnz; u++) {
 		int i = Ti[u];
 		int j = Tj[u];
@@ -226,8 +226,7 @@ void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y)
 	int *Aj = A->Aj;
 	double *Ax = A->Ax;
         omp_set_num_threads(nbth);
-
-        #pragma omp parallel for  
+        #pragma omp parallel for
 
 	for (int i = 0; i < n; i++) {
 		y[i] = 0;
@@ -280,7 +279,7 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
 	/* Isolate diagonal */
 	extract_diagonal(A, d);
 
-	/* 
+	/*
 	 * This function follows closely the pseudo-code given in the (english)
 	 * Wikipedia page "Conjugate gradient method". This is the version with
 	 * preconditionning.
@@ -297,7 +296,7 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
 		for (int i = 0; i < n; i++)	// p <-- z
 			p[i] = z[i];
 	}
-	
+
 	double rz = dot(n, r, z);
 	double start = wtime();
 	double last_display = start;
@@ -355,13 +354,13 @@ int main(int argc, char **argv)
 	int safety_check = 1;
 	char ch;
 //Options lorsqu'on lance le programme
-// BUG : Prise en compte des options courtes 
+// BUG : Prise en compte des options courtes
          while ((ch = getopt_long(argc, argv, "s:r:m:o:ct:", longopts, NULL)) != -1)
-         { 
+         {
 		switch (ch) {
                 case 't':
                         nbth = atoi(optarg);
-                        break; 
+                        break;
 		case 's':
 			seed = atoll(optarg);
 			break;
