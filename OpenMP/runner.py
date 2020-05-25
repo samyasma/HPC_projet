@@ -22,13 +22,12 @@ params['matrix'] = "parabolic_fem"
 params['users'] = ["Samy ASMA"]
 
 # Description du code exécuté
-params['software'] = """Code séquentiel fourni.
-Pas d'améliorations apportées."""
+params['software'] = """Code OpenMp. amélioration fourni"""
 
 # Description du matériel utilisé pour l'exécution
-params['nodes'] = 1   # nombre de noeuds
-params['cores'] = 1   # nombre total de coeurs
-params['hardware'] = """sequentiel"""
+params['nodes'] = 4   # nombre de noeuds
+params['cores'] = 4   # nombre total de coeurs
+params['hardware'] = """OPenMP"""
 
 # Comment exécuter le solveur :
 #   {matrix} sera remplacé par la valeur ci-dessus.
@@ -36,7 +35,7 @@ params['hardware'] = """sequentiel"""
 #   {cores}  sera remplacé par la valeur ci-dessus.
 #   {seed}   sera remplacé par la valeur fournie par le serveur.
 #   On peut ajouter toutes les options qu'on veut, utiliser mpiexec, etc.
-command_line = "./cg --matrix ../{matrix}.mtx --seed {seed}"
+command_line = "./cg --matrix ../Matrix/{matrix}.mtx --seed {seed}"
 #command_line = "zcat matrices/{matrix}.mtx.gz | ./cg --seed {seed}"
 #command_line = "mpiexec --n {cores} --hostfile nodes.txt --display-map ./cg --matrix {matrix}.mtx --seed {seed}"
 #command_line = "mpiexec --n {nodes} -hostfile nodes.txt --map-by ppr:1:node ./cg --matrix {matrix}.mtx --seed {seed}"
