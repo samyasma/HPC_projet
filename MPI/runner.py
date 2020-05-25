@@ -22,8 +22,7 @@ params['matrix'] = "parabolic_fem"
 params['users'] = ["Samy ASMA"]
 
 # Description du code exécuté
-params['software'] = """Code séquentiel fourni.
-Pas d'améliorations apportées."""
+params['software'] = """Code MPI."""
 
 # Description du matériel utilisé pour l'exécution
 params['nodes'] = 2   # nombre de noeuds
@@ -37,10 +36,10 @@ Machines de bureau DELL équipés de CPU Intel i3 à 2 coeurs, 3Ghz, et 4Go de R
 #   {cores}  sera remplacé par la valeur ci-dessus.
 #   {seed}   sera remplacé par la valeur fournie par le serveur.
 #   On peut ajouter toutes les options qu'on veut, utiliser mpiexec, etc.
-command_line = "./cg --matrix {matrix}.mtx --seed {seed}"
+#command_line = "./cg --matrix {matrix}.mtx --seed {seed}"
 #command_line = "zcat matrices/{matrix}.mtx.gz | ./cg --seed {seed}"
-#command_line = "mpiexec --n {cores} --hostfile nodes.txt --display-map ./cg --matrix {matrix}.mtx --seed {seed}"
-#command_line = "mpiexec --n {nodes} -hostfile nodes.txt --map-by ppr:1:node ./cg --matrix {matrix}.mtx --seed {seed}"
+command_line = "mpiexec --n {cores} -mca btl_tcp_if_include eth1 --hostfile hostfile --display-map ./cg --matrix {matrix}.mtx --seed {seed}"
+#command_line = "mpiexec --n {nodes} -hostfile hostfile --map-by ppr:1:node ./cg --matrix {matrix}.mtx --seed {seed}"
 
 ######################### Main Program ###########################
 
