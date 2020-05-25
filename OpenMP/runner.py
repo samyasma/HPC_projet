@@ -18,7 +18,7 @@ params['proof'] = 0x65dec1542f679f51
 # Paramètres du calcul (à adapter)
 
 
-params['matrix'] = "parabolic_fem"
+params['matrix'] = "msdoor"
 params['users'] = ["Samy ASMA"]
 
 # Description du code exécuté
