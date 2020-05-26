@@ -32,9 +32,9 @@
 
 #include <omp.h>
 
-#define THRESHOLD 1e-4		// maximum tolerance threshold
+#define THRESHOLD 1e-8		// maximum tolerance threshold
 
-int nbth = 3 ; // Number of thread 
+int nbth = 8 ; // Number of thread 
 
 struct csr_matrix_t {
 	int n;			// dimension
