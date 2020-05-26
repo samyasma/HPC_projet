@@ -2,8 +2,8 @@
 CC = gcc
 
 # Add your choice of flags
-CFLAGS = -fopenmp
-LDFLAGS = -fopenmp
+CDFLAGS= -fopenmp
+LDFLAGS= -fopenmp
 LDLIBS = -lm
 
 all : clean cg
