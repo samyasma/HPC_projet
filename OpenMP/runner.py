@@ -18,8 +18,8 @@ params['proof'] = 0x65dec1542f679f51
 # Paramètres du calcul (à adapter)
 
 
-params['matrix'] = "parabolic_fem"
-params['users'] = ["Homer Durand"]
+params['matrix'] = "hood"
+params['users'] = ["Homer Durand","Samy ASMA"]
 
 # Description du code exécuté
 params['software'] = """Code OpenMp. amélioration fourni"""
@@ -35,8 +35,8 @@ params['hardware'] = """OPenMP"""
 #   {cores}  sera remplacé par la valeur ci-dessus.
 #   {seed}   sera remplacé par la valeur fournie par le serveur.
 #   On peut ajouter toutes les options qu'on veut, utiliser mpiexec, etc.
-command_line = "./cg --matrix ../Matrix/{matrix}.mtx --seed {seed}"
-#command_line = "zcat matrices/{matrix}.mtx.gz | ./cg --seed {seed}"
+#command_line = "./cg --matrix ../Matrix/{matrix}.mtx --seed {seed}"
+command_line = "zcat /Infos/lmd/2019/master/ue/MU4IN903-2020fev/{matrix}.mtx.gz | ./cg --seed {seed}"
 #command_line = "mpiexec --n {cores} --hostfile nodes.txt --display-map ./cg --matrix {matrix}.mtx --seed {seed}"
 #command_line = "mpiexec --n {nodes} -hostfile nodes.txt --map-by ppr:1:node ./cg --matrix {matrix}.mtx --seed {seed}"
 
