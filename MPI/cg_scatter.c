@@ -31,7 +31,7 @@
 #include "mmio.h"
 #define SIZE_H_N 50
 #define THRESHOLD 1e-8		// maximum tolerance threshold
-
+#define min(a,b) (a<=b?a:b)
 struct csr_matrix_t {
 	int n;			// dimension
 	int nz;			// number of non-zero entries
@@ -219,7 +219,7 @@ void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y)
 	}
 }
 
-void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my_rank, int total)
+void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y_local,int my_rank, int total)
 {
 	int n = A->n;
 	int *Ap = A->Ap;
@@ -227,26 +227,15 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my
 	double *Ax = A->Ax;
 
 	int debut = (my_rank*n)/total;
-	int fin= ((my_rank+1)*n)/total;
-	double *temp=malloc(8*(fin-debut)*sizeof(double));
+	int fin= min(n,((my_rank+1)*n)/total);
 	for (int i = debut; i < fin; i++) {
-		temp[i-debut] = 0;
+		y_local[i-debut] = 0;
 		for (int u = Ap[i]; u < Ap[i + 1]; u++) {
 			int j = Aj[u];
 			double A_ij = Ax[u];
-			temp[i-debut] += A_ij * x[j];
+			y_local[i-debut] += A_ij * x[j];
 		}
 	}
-	int *sizes = (int *)malloc(total*sizeof(int)); // Tailles des tableaux envoyés
-	int *starts = (int *)malloc(total*sizeof(int)); // Adresses dans le y
-	for(int i = 0 ; i < total ; i++){
-		sizes[i] = (i+1)*n/total - i*n/total;
-		starts[i] = i*n/total;
-		// fprintf(stderr,"%d : sizes = %d et starts = %d\n",i,sizes[i],starts[i]);
-	}
-
-	//MPI_Allgather(temp,fin-debut,MPI_DOUBLE,y,n/total,MPI_DOUBLE,MPI_COMM_WORLD);
-	MPI_Allgatherv(temp,fin-debut , MPI_DOUBLE,y,sizes,starts , MPI_DOUBLE, MPI_COMM_WORLD);
 
 }
 
@@ -255,7 +244,7 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y,int my
 /*************************** Vector operations ********************************/
 
 /* dot product */
-double dot(const int n, const double *x, const double *y)
+double dot_local(const int n, const double *x, const double *y)
 {
 	double sum = 0.0;
 	for (int i = 0; i < n; i++)
@@ -267,7 +256,7 @@ double dot_mpi(const int n, const double *x, const double *y,int my_rank,int tot
 {
 	double sum = 0.0;
 	int debut = (my_rank*n)/total;
-	int fin= ((my_rank+1)*n)/total;
+	int fin= min(n,((my_rank+1)*n)/total);
 	double temp=0.0;
 	for (int i = debut; i < fin; i++){
 		temp += x[i] * y[i];
@@ -280,7 +269,7 @@ double dot_mpi(const int n, const double *x, const double *y,int my_rank,int tot
 /* euclidean norm (a.k.a 2-norm) */
 double norm(const int n, const double *x)
 {
-	return sqrt(dot(n, x, x));
+	return sqrt(dot_local(n, x, x));
 }
 
 double norm_mpi(const int n, const double *x,int my_rank,int total)
@@ -310,123 +299,123 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 	/////////////////ETAPE 1////
 	////DISTRIBUTION DES VECTEURS////
-	int vSize = ceil((double)n / total); //partial vector size for each
-	int vSize2 = n - (total-1)*vSize;    //vector size for last process
-	if (vSize2 < 0) { //Error case
-		printf("Invalid num processors, exiting..\n");
-		exit(0);
-	}
+	int taille = ceil((double)n / total); //partial vector size for each
 	if (my_rank == total-1) {
-		vSize = vSize2;
+		taille = n - (total-1)*taille;
 	}
 
 	// Vector size and displacement for each processor
-	int taille_x_local[total],taille_b_local[total], deplac_x_local[total],deplac_b_local[total];
-		for (int p = 0; p < total-1; p++) {
-			taille_x_local[p] = vSize;
-			deplac_x_local[p] = p*vSize;
-			taille_b_local[p] = vSize;
-			deplac_b_local[p] = p*vSize;
-		}
-		taille_x_local[total-1] = vSize2;
-		deplac_x_local[total-1] = (total-1)*vSize;
-		taille_b_local[total-1] = vSize2;
-		deplac_b_local[total-1] = (total-1)*vSize;
-	// Prepare to store local vector entries
-	double *b_local = (double *)malloc(sizeof(double) * vSize);
-	double *x_local = (double *)malloc(sizeof(double) * vSize);
-	// Scatter vector entries to each processor
-	MPI_Bcast(&n,1,MPI_INT,0,MPI_COMM_WORLD);
-	//pour x
-	MPI_Scatterv(x,taille_x_local,deplac_x_local,MPI_DOUBLE,x_local,vSize,MPI_DOUBLE,0,MPI_COMM_WORLD);
-	//pour b
-	MPI_Scatterv(b,taille_b_local,deplac_b_local,MPI_DOUBLE,b_local,vSize,MPI_DOUBLE,0,MPI_COMM_WORLD);
-
+	int taille_local[total],deplac_local[total];
+	taille_local[my_rank] = taille;
+	deplac_local[my_rank] = my_rank*taille;
 
 	////// Pour la matrice
-	int taille_mat[total]; int depla_mat[total];
+	/*int taille_mat[total]; int depla_mat[total];
 		for (int p = 0; p < total; p++) {
-			taille_mat[p] = row_ptr[p*vSize+deplac_x_local[p]] - row_ptr[p*vSize];
-			depla_mat[p] = row_ptr[p*vSize];
+			taille_mat[p] = row_ptr[p*taille+deplac_local[p]] - row_ptr[p*taille];
+			depla_mat[p] = row_ptr[p*taille];
 		}
-
 	//////////ENVOIE AUX AUTRES
-	int myNumE;
 	MPI_Scatter(taille_mat,1,MPI_INT,&myNumE,1,MPI_INT,0,MPI_COMM_WORLD);
-
 	int *rowptr_local = (int *)malloc(sizeof(int) * (vSize+1));
-	MPI_Scatterv(row_ptr,taille_x_local,deplac_x_local,MPI_INT,
-		rowptr_local,vSize,MPI_INT,0,MPI_COMM_WORLD);
-	rowptr_local[vSize] = myNumE;
-
-	int *col_local = (int *)malloc(sizeof(int) * myNumE);
-	MPI_Scatterv(indice_col,taille_mat,depla_mat,MPI_INT,
-			col_local,myNumE,MPI_INT,0,MPI_COMM_WORLD);
-
-	double *mat_val_local = (double *)malloc(sizeof(double) * myNumE);
-	MPI_Scatterv(valeur_mat,taille_mat,depla_mat,MPI_DOUBLE,
-	mat_val_local,myNumE,MPI_DOUBLE,0,MPI_COMM_WORLD);
+	MPI_Scatterv(row_ptr,taille_local,deplac_local,MPI_INT,
+		rowptr_local,vSize,MPI_INT,0,MPI_COMM_WORLD);*/
 
 
+	//int *col_local = (int *)malloc(sizeof(int) * myNumE);
+	//MPI_Scatterv(indice_col,taille_local,deplac_loca,MPI_INT,
+	//		col_local,myNumE,MPI_INT,0,MPI_COMM_WORLD);
+
+	//double *mat_val_local = (double *)malloc(sizeof(double) * myNumE);
+	//MPI_Scatterv(valeur_mat,taille_local,deplac_loca,MPI_DOUBLE,
+	//mat_val_local,myNumE,MPI_DOUBLE,0,MPI_COMM_WORLD);
 
 
-	////////////RESTE DU CODE
-	double *r = scratch;	        // residue
-	double *z = scratch + n;	// preconditioned-residue
+
+
+	//////////// ON GARDE P ET D
 	double *p = scratch + 2 * n;	// search direction
-	double *q = scratch + 3 * n;	// q == Ap
 	double *d = scratch + 4 * n;	// diagonal entries of A (Jacobi preconditioning)
 
 	/* Isolate diagonal */
 	extract_diagonal(A, d);
 
-	/*
-	 * This function follows closely the pseudo-code given in the (english)
-	 * Wikipedia page "Conjugate gradient method". This is the version with
-	 * preconditionning.
-	 */
 
-	/* We use x == 0 --- this avoids the first matrix-vector product. */
-	for (int i = 0; i < n; i++)
-		x[i] = 0.0;
-	for (int i = 0; i < n; i++)	// r <-- b - Ax == b
-		r[i] = b[i];
-	for (int i = 0; i < n; i++)	// z <-- M^(-1).r
-		z[i] = r[i] / d[i];
-	for (int i = 0; i < n; i++)	// p <-- z
-		p[i] = z[i];
 
-	double rz = dot_mpi(n, r, z,my_rank,total);
+	/////Les matrice local à utiliser
+	double *r_local = malloc(taille*sizeof(double));	        // residue
+	double *z_local = malloc(taille*sizeof(double));	// preconditioned-residue
+	double *p_local = malloc(taille*sizeof(double));	// search direction
+	double *q_local = malloc(taille*sizeof(double));	// q == Ap
+	double *d_local = malloc(taille*sizeof(double));	// diagonal entries of A (Jacobi preconditioning)
+	double *x_local = malloc(taille*sizeof(double));
+	/* We use x == 0 --- this avoids the first matrix-vector product.*/
+	//On supprime x car pas besoin
+	int debut=my_rank*taille;
+	int fin=(my_rank+1)*taille;
+	for (int i =debut ; i < fin; i++)	// r <-- b - Ax == b
+		r_local[i-debut] = b[i];
+	for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
+		z_local[i-debut] = r_local[i-debut] / d[i];
+	for (int i = debut; i < fin; i++)	// p <-- z
+		p_local[i] = z_local[i];
+
+	double rz=0.0;
+	double rz_local = dot_local(taille, r_local, z_local);
+	MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 	double start = wtime();
 	double last_display = start;
 	int iter = 0;
-	while (norm_mpi(n, r,my_rank,total) > epsilon) {
+	double erreur_local=dot_local(taille, r_local, r_local);
+	double erreur=0.0;
+	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+	erreur=sqrt(erreur);
+	while (erreur > epsilon) {
 		/* loop invariant : rz = dot(r, z) */
 		double old_rz = rz;
-		sp_gemv_mpi(A, p, q,my_rank,total);	/* q <-- A.p */
-		double alpha = old_rz / dot_mpi(n, p, q,my_rank,total);
-		for (int i = 0; i < n; i++)	// x <-- x + alpha*p
-			x[i] += alpha * p[i];
-		for (int i = 0; i < n; i++)	// r <-- r - alpha*q
-			r[i] -= alpha * q[i];
-		for (int i = 0; i < n; i++)	// z <-- M^(-1).r
-			z[ i] = r[i] / d[i];
-		rz = dot_mpi(n, r, z,my_rank,total);	// restore invariant
+		sp_gemv_mpi(A, p, q_local,my_rank,total);	/* q <-- A.p */
+		double dot=0.0;
+		double local = dot_local(taille, p_local, q_local);
+		MPI_Allreduce(&local,&dot,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		double alpha = old_rz / dot;
+		for (int i = debut; i < fin; i++)	// x <-- x + alpha*p
+			x_local[i-debut] += alpha * p_local[i-debut];
+		for (int i = debut; i < fin; i++)	// r <-- r - alpha*q
+			r_local[i-debut] -= alpha * q_local[i-debut];
+		for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
+			z_local[i] = r_local[i] / d[i];
+		double rz_local=dot_local(n, r_local, z_local);
+		MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		double beta = rz / old_rz;
-		for (int i = 0; i < n; i++)	// p <-- z + beta*p
-			p[i] = z[i] + beta * p[i];
+
+		for (int i = debut; i < fin; i++)	// p <-- z + beta*p
+			p_local[i] = z_local[i] + beta * p_local[i];
+
+		///On rassemble p car on en a besoin pour le produit matrice
+		MPI_Allgatherv(p_local,fin-debut, MPI_DOUBLE,p,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
 		iter++;
 		double t = wtime();
+
+		double erreur_local=dot_local(taille, r_local, r_local);
+		double erreur=0.0;
+		MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		erreur=sqrt(erreur);
+		if (my_rank==0) {
 		if (t - last_display > 0.5) {
 			/* verbosity */
 			double rate = iter / (t - start);	// iterations per s.
 			double GFLOPs = 1e-9 * rate * (2 * nz + 12 * n);
-			fprintf(stderr, "\r     ---> error : %2.2e, iter : %d (%.1f it/s, %.2f GFLOPs)", norm(n, r), iter, rate, GFLOPs);
+			fprintf(stderr, "\r     ---> error : %2.2e, iter : %d (%.1f it/s, %.2f GFLOPs)", erreur, iter, rate, GFLOPs);
 			fflush(stdout);
 			last_display = t;
 		}
 	}
-	fprintf(stderr, "\n     ---> Finished in %.1fs and %d iterations\n", wtime() - start, iter);
+	MPI_Allgatherv(x_local,taille,MPI_DOUBLE,x,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
+	}
+	if (my_rank==0) {
+		fprintf(stderr, "\n     ---> Finished in %.1fs and %d iterations\n", wtime() - start, iter);
+	}
+
 }
 
 
