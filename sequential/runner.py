@@ -18,7 +18,7 @@ params['proof'] = 0x65dec1542f679f51
 # Paramètres du calcul (à adapter)
 
 
-params['matrix'] = "hood"
+params['matrix'] = "Queen_4147"
 params['users'] = ["Samy ASMA"]
 
 # Description du code exécuté
