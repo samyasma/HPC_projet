@@ -5,7 +5,7 @@ CC = mpicc
 CFLAGS = -O3 -Wall -Wextra -g
 LDLIBS = -lm
 
-all : cg_scatter
+all :clean cg_scatter
 
 cg : cg.o mmio.o
 cg_scatter : cg_scatter.o mmio.o
@@ -15,4 +15,4 @@ cg_scatter.o : cg_scatter.c mmio.h
 
 .PHONY: clean
 clean :
-	rm -rf *.o cg
+	rm -rf *.o cg cg_scatter
