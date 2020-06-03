@@ -1,4 +1,4 @@
-/* 
+/*
  * Sequential implementation of the Conjugate Gradient Method.
  *
  * Authors : Lilia Ziane Khodja & Charles Bouillaguet
@@ -8,8 +8,8 @@
  * CHANGE LOG:
  *    v1.01 : fix a minor printing bug in load_mm (incorrect CSR matrix size)
  *    v1.02 : use https instead of http in "PRO-TIP"
- *  
- * USAGE: 
+ *
+ * USAGE:
  * 	$ ./cg --matrix bcsstk13.mtx                # loading matrix from file
  *      $ ./cg --matrix bcsstk13.mtx > /dev/null    # ignoring solution
  *	$ ./cg < bcsstk13.mtx > /dev/null           # loading matrix from stdin
@@ -30,13 +30,13 @@
 
 #include "mmio.h"
 
-#ifdef _OPENMP 
-#include <omp.h> 
+#ifdef _OPENMP
+#include <omp.h>
 #endif
 
 #define THRESHOLD 1e-8		// maximum tolerance threshold
 
-int nbth = 4 ; // Number of thread 
+int nbth = 4 ; // Number of thread
 
 struct csr_matrix_t {
 	int n;			// dimension
@@ -115,7 +115,7 @@ struct csr_matrix_t *load_mm(FILE * f)
 		/*
 		 * Uncomment this to check input (but it slows reading)
 		 * if (i < 1 || i > n || j < 1 || j > i)
-		 *	errx(2, "invalid entry %d : %d %d\n", u, i, j); 
+		 *	errx(2, "invalid entry %d : %d %d\n", u, i, j);
 		 */
 		Tx[u] = x;
 	}
@@ -217,7 +217,7 @@ void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y)
 	double *Ax = A->Ax;
 	double sum;
 
-	#pragma omp parallel do private(i,j,sum)
+	#pragma omp parallel for
 	for (int i = 0; i < n; i++) {
 		sum = 0;
 		for (int u = Ap[i]; u < Ap[i + 1]; u++) {
@@ -235,7 +235,7 @@ void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y)
 double dot(const int n, const double *x, const double *y)
 {
 	double sum = 0.0;
-	#pragma omp parallel for private(i) reduction(+:sum)
+	#pragma omp parallel for reduction(+:sum)
 	for (int i = 0; i < n; i++){
 		sum += x[i] * y[i];
 		// fprintf(stderr, "thread %d\n", omp_get_thread_num());
@@ -270,7 +270,7 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
 	/* Isolate diagonal */
 	extract_diagonal(A, d);
 
-	/* 
+	/*
 	 * This function follows closely the pseudo-code given in the (english)
 	 * Wikipedia page "Conjugate gradient method". This is the version with
 	 * preconditionning.
@@ -278,8 +278,8 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
 
 	/* We use x == 0 --- this avoids the first matrix-vector product. */
 	for (int i = 0; i < n; i++)
-		x[i] = 0.0;	
-		//fprintf(stderr, "thread %d\n",omp_get_thread_num());	
+		x[i] = 0.0;
+		//fprintf(stderr, "thread %d\n",omp_get_thread_num());
 	for (int i = 0; i < n; i++)	// r <-- b - Ax == b
 		r[i] = b[i];
 	for (int i = 0; i < n; i++)	// z <-- M^(-1).r
@@ -297,27 +297,27 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
 		sp_gemv(A, p, q);	/* q <-- A.p */
 		double alpha = old_rz / dot(n, p, q);
    		// fprintf(stderr, "section 1 thread %d\n", omp_get_thread_num());
-		#pragma omp parallel for 
+		#pragma omp parallel for
 		for (int i = 0; i < n; i++){	// x <-- x + alpha*p
 			x[i] += alpha * p[i];
 			fprintf(stderr, "Thread %d/%d\n", omp_get_thread_num(),
 omp_get_num_threads());
 			}
-		#pragma omp parallel for private(i)	
+		#pragma omp parallel for
    		// fprintf(stderr, "section 2 thread %d\n", omp_get_thread_num());
 		for (int i = 0; i < n; i++){	// r <-- r - alpha*q
 			r[i] -= alpha * q[i];
 			}
-		
+
    		// fprintf(stderr, "section 3 thread %d\n", omp_get_thread_num());
-		#pragma omp parallel for private(i)
+		#pragma omp parallel for
 		for (int i = 0; i < n; i++)	// z <-- M^(-1).r
 			z[i] = r[i] / d[i];
 
 		rz = dot(n, r, z);	// restore invariant
 		double beta = rz / old_rz;
 
-		#pragma parallel for private(i)
+		#pragma parallel for
 		for (int i = 0; i < n; i++){	// p <-- z + beta*p
 			p[i] = z[i] + beta * p[i];
 		}
