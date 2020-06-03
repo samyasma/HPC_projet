@@ -300,8 +300,6 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
 		#pragma omp parallel for
 		for (int i = 0; i < n; i++){	// x <-- x + alpha*p
 			x[i] += alpha * p[i];
-			fprintf(stderr, "Thread %d/%d\n", omp_get_thread_num(),
-omp_get_num_threads());
 			}
 		#pragma omp parallel for
    		// fprintf(stderr, "section 2 thread %d\n", omp_get_thread_num());
