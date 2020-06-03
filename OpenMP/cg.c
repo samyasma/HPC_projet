@@ -30,7 +30,9 @@
 
 #include "mmio.h"
 
-#include <omp.h>
+#ifdef _OPENMP 
+#include <omp.h> 
+#endif
 
 #define THRESHOLD 1e-8		// maximum tolerance threshold
 
@@ -214,7 +216,7 @@ void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y)
 	int *Aj = A->Aj;
 	double *Ax = A->Ax;
 	double sum;
-	//omp_set_num_threads(nbth);
+
 	#pragma omp parallel do private(i,j,sum)
 	for (int i = 0; i < n; i++) {
 		sum = 0;
@@ -295,9 +297,11 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
 		sp_gemv(A, p, q);	/* q <-- A.p */
 		double alpha = old_rz / dot(n, p, q);
    		// fprintf(stderr, "section 1 thread %d\n", omp_get_thread_num());
-		#pragma omp parallel for private(i)	
+		#pragma omp parallel for 
 		for (int i = 0; i < n; i++){	// x <-- x + alpha*p
 			x[i] += alpha * p[i];
+			fprintf(stderr, "Thread %d/%d\n", omp_get_thread_num(),
+omp_get_num_threads());
 			}
 		#pragma omp parallel for private(i)	
    		// fprintf(stderr, "section 2 thread %d\n", omp_get_thread_num());
@@ -346,7 +350,7 @@ struct option longopts[6] = {
 
 int main(int argc, char **argv)
 {
-	omp_set_num_threads(omp_get_max_threads());
+	// omp_set_num_threads(omp_get_max_threads());
 	/* Parse command-line options */
 	long long seed = 0;
 	char *rhs_filename = NULL;

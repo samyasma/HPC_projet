@@ -1,12 +1,12 @@
+
 # your choice of compiler
 CC = gcc
 
 # Add your choice of flags
-CDFLAGS= -fopenmp
-LDFLAGS= -fopenmp
-LDLIBS = -lm
+CFLAGS = -O3 -Wall -Wextra -g -fopenmp
+LDLIBS = -lm -fopenmp
 
-all : clean cg
+all : cg
 
 cg : cg.o mmio.o
 mmio.o : mmio.c mmio.h

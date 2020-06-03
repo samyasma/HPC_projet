@@ -21,7 +21,7 @@ if len(sys.argv) < 2:
     sys.exit(1)
 
 # charge le reçu
-receipt_filename = sys.argv[1]
+receipt_filename = "Receipt/{}".format(sys.argv[1])
 try:
     with open(receipt_filename) as f:
         serialized_receipt, signature = json.load(f)

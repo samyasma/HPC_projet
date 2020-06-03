@@ -18,8 +18,8 @@ params['proof'] = 0x65dec1542f679f51
 # Paramètres du calcul (à adapter)
 
 
-params['matrix'] = "hood"
-params['users'] = ["Samy ASMA"]
+params['matrix'] = "parabolic_fem"
+params['users'] = ["Homer Durand"]
 
 # Description du code exécuté
 params['software'] = """Code OpenMp. amélioration fourni"""
@@ -176,7 +176,7 @@ def do_proof(seed, x, e, secret, chunks):
     print()
 
     # YES ! On a obtenu le reçu du serveur. On le sauvegarde précieusement.
-    receipt_filename = "{}-{}.receipt".format(params['matrix'], seed)
+    receipt_filename = "Receipt/{}-{}.receipt".format(params['matrix'], seed)
     print("--> [writing receipt in {}]".format(receipt_filename))
     with open(receipt_filename, "w") as file:
         json.dump(f['receipt'], file)
