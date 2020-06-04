@@ -285,9 +285,9 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 {
 	int n = A->n; /// length of matrix
 	int nz = A->nz; //number of non zeros
-	int *row_ptr=A->Ap; // row indices
-	int *indice_col=A->Aj; // column indices
-	double *valeur_mat=A->Ax; //coefficientmak
+	//int *row_ptr=A->Ap; // row indices
+	//int *indice_col=A->Aj; // column indices
+	//double *valeur_mat=A->Ax; //coefficientmak
 
 	if(my_rank==0){
 	fprintf(stderr, "[CG] Starting iterative solver\n");
@@ -347,7 +347,6 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double *z_local = malloc(taille*sizeof(double));	// preconditioned-residue
 	double *p_local = malloc(taille*sizeof(double));	// search direction
 	double *q_local = malloc(taille*sizeof(double));	// q == Ap
-	double *d_local = malloc(taille*sizeof(double));	// diagonal entries of A (Jacobi preconditioning)
 	double *x_local = malloc(taille*sizeof(double));
 	/* We use x == 0 --- this avoids the first matrix-vector product.*/
 	//On supprime x car pas besoin
