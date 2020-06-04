@@ -206,9 +206,22 @@ void extract_diagonal(const struct csr_matrix_t *A, double *d)
 				d[i] += Ax[u];
 	}
 }
+void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y)
+{
+	int n = A->n;
+	int *Ap = A->Ap;
+	int *Aj = A->Aj;
+	double *Ax = A->Ax;
+	for (int i = 0; i < n; i++) {
+		y[i] = 0;
+		for (int u = Ap[i]; u < Ap[i + 1]; u++) {
+			int j = Aj[u];
+			double A_ij = Ax[u];
+			y[i] += A_ij * x[j];
+		}
+	}
 
-
-void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y_local,int taille_loc, int debut)
+void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y_local,int taille_loc, int debut)
 {
 	int n = A->n;
 	int *Ap = A->Ap;
@@ -333,7 +346,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		/* loop invariant : rz = dot(r, z) */
 		double old_rz = rz;
 
-		sp_gemv(A, p, q_local,taille_loc,debut);	/* q <-- A.p */
+		sp_gemv_mpi(A, p, q_local,taille_loc,debut);	/* q <-- A.p */
 		double dot=0.0;
 		double local = dot_local(taille_loc, p_local, q_local);
 		MPI_Allreduce(&local,&dot,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
