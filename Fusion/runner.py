@@ -177,7 +177,7 @@ def do_proof(seed, x, e, secret, chunks):
     print()
 
     # YES ! On a obtenu le reçu du serveur. On le sauvegarde précieusement.
-    receipt_filename = "{}-{}.receipt".format(params['matrix'], seed)
+    receipt_filename = "Rceipt/{}-{}.receipt".format(params['matrix'], seed)
     print("--> [writing receipt in {}]".format(receipt_filename))
     with open(receipt_filename, "w") as file:
         json.dump(f['receipt'], file)

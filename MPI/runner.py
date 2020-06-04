@@ -53,7 +53,7 @@ def main():
         # pas de checkpoint : on fait le calcul.
         seed, x, e, secret, chunks = do_computation()
         # OK, maintenant on peut se relaxer et prendre notre temps. Le serveur sait
-        # qu'on a fini. On a intérêt à sauvegarder notre état interne, juste au cas 
+        # qu'on a fini. On a intérêt à sauvegarder notre état interne, juste au cas
         # où un problème ait lieu.
         checkpoint(checkpoint_filename, seed, x, e)
     else:
@@ -77,8 +77,8 @@ def do_computation():
     print("SERVER says : {}".format(d['msg']))
     print("SERVER gives seed = {}".format(d['seed']))
     print()
-    
-    # Tente d'éxecuter le solveur. 
+
+    # Tente d'éxecuter le solveur.
     cmd = command_line.format(seed=d['seed'], **params)
     print("--> [Starting : {}]".format(cmd))
     try:
@@ -91,19 +91,19 @@ def do_computation():
         print("---------------------------------------------------------------")
         print("Ooops, le solveur a échoué (code de retour != 0).")
         sys.exit(1)
-    
-    # REMARQUE : la mesure de temps effectuée par le serveur inclut a priori le 
-    #            temps nécessaire pour charger la matrice depuis le système de 
+
+    # REMARQUE : la mesure de temps effectuée par le serveur inclut a priori le
+    #            temps nécessaire pour charger la matrice depuis le système de
     #            fichier, ce qui est séquentiel et peut être assez long pour les
-    #            plus grosses. 
-    #            Le comité d'organisation du benchmark (cf. infra) a étudié la 
-    #            possibilité que des étudiants puissent tenter de lancer le 
-    #            solveur et de précharger la matrice en RAM **AVANT** d'avoir 
+    #            plus grosses.
+    #            Le comité d'organisation du benchmark (cf. infra) a étudié la
+    #            possibilité que des étudiants puissent tenter de lancer le
+    #            solveur et de précharger la matrice en RAM **AVANT** d'avoir
     #            reçu le vecteur b, pour avoir un avantage compétitif. Le comité
-    #            a décidé que les étudiants n'étaient certainement pas assez 
+    #            a décidé que les étudiants n'étaient certainement pas assez
     #            bons pour mettre en oeuvre cette stratégie, et d'ailleurs on ne
     #            va pas leur suggérer.
-    
+
     # le solveur a terminé avec succès. On récupère le vecteur solution.
     x = []
     for line in result.stdout.decode().splitlines():
@@ -111,7 +111,7 @@ def do_computation():
     print("Got solution from the solver ({:.1f} Kbyte).".format(0.0078125 * len(x)))
     print()
 
-    # Le chrono tourne toujours. On hashe x le plus vite possible, puis on 
+    # Le chrono tourne toujours. On hashe x le plus vite possible, puis on
     # envoie l'empreinte au serveur pour mettre le vecteur en gage.
     print("--> [Computing commitment]")
     print()
@@ -127,7 +127,7 @@ def do_computation():
     print('SERVER wants me to transmit {} "random" coefficients of x (out of {})'.format(len(e['transmit']), len(x)))
     print("SERVER wants me to decommit x[{}]".format(e['challenge']))
     print()
-    
+
     return d['seed'], x, e, secret, chunks
 
 
@@ -157,14 +157,14 @@ def restart(filename):
 
 
 def do_proof(seed, x, e, secret, chunks):
-    # Maintenant, pour obtenir un reçu, il faut convaincre le serveur qu'on a 
-    # effectué le calcul correctement. On pourrait envoyer tout x, mais c'est 
+    # Maintenant, pour obtenir un reçu, il faut convaincre le serveur qu'on a
+    # effectué le calcul correctement. On pourrait envoyer tout x, mais c'est
     # trop long (il peut faire des dizaines de Mo).
-    # Pour régler ce problème, une réunion au sommet s'est tenue entre les 
-    # responsables de HPC et de ISEC (le fameux "comité d'organisation du 
-    # benchmark"). Il est en sorti un protocole (non-publié) pour démontrer au 
-    # serveur qu'on a VRAIMENT calculé une solution de Ax == b en ne lui 
-    # révélant qu'un tout petit bout de x. Comme le serveur ne vérifie pas 
+    # Pour régler ce problème, une réunion au sommet s'est tenue entre les
+    # responsables de HPC et de ISEC (le fameux "comité d'organisation du
+    # benchmark"). Il est en sorti un protocole (non-publié) pour démontrer au
+    # serveur qu'on a VRAIMENT calculé une solution de Ax == b en ne lui
+    # révélant qu'un tout petit bout de x. Comme le serveur ne vérifie pas
     # tout x, il doit bien y avoir un moyen de tricher... peut-être ?
     coeffs = [x[i] for i in e['transmit']]
     proof = decommit(secret, chunks, e['challenge'] // 38)
@@ -177,7 +177,7 @@ def do_proof(seed, x, e, secret, chunks):
     print()
 
     # YES ! On a obtenu le reçu du serveur. On le sauvegarde précieusement.
-    receipt_filename = "{}-{}.receipt".format(params['matrix'], seed)
+    receipt_filename = "Receipt/{}-{}.receipt".format(params['matrix'], seed)
     print("--> [writing receipt in {}]".format(receipt_filename))
     with open(receipt_filename, "w") as file:
         json.dump(f['receipt'], file)
@@ -204,7 +204,7 @@ def request(url, method='GET', **kwds):
     return json.loads(response)
 
 def commit(it):
-    """ 
+    """
     Prend en entrée un iterable d'objets de type bytes(), et renvoie une
     paire (mise en gage, secret). Le secret est ensuite utilisé par decommit().
     """
@@ -245,7 +245,7 @@ def decommit(secret, x, i):
             witness_hash, _ = node_tree[1-bit]
             proof.append(witness_hash)
             _, node_tree = node_tree[bit]
-    return (base64.b64encode(x[i]).decode(), 
+    return (base64.b64encode(x[i]).decode(),
         base64.b64encode(b''.join(reversed(proof))).decode())
 
 
