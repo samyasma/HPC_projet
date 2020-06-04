@@ -374,7 +374,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		for (int i = debut; i < fin; i++){	// r <-- r - alpha*q
 			r_local[i-debut] -= alpha * q_local[i-debut];}
 		for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
-			z_local[i] = r_local[i] / d[i];
+			z_local[i-debut] = r_local[i-debut] / d[i];
 
 		double rz_local=dot_local(n, r_local, z_local);
 		MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
