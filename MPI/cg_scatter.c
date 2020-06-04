@@ -1,16 +1,5 @@
-/*
- * Sequential implementation of the Conjugate Gradient Method.
- *
- * Authors : Lilia Ziane Khodja & Charles Bouillaguet
- *
- * v1.02 (2020-04-3)
- *
- * CHANGE LOG:
- *    v1.01 : fix a minor printing bug in load_mm (incorrect CSR matrix size)
- *    v1.02 : use https instead of http in "PRO-TIP"
- *
- * USAGE:
- * 	$ ./cg --matrix bcsstk13.mtx                # loading matrix from file
+
+/* 	$ ./cg --matrix bcsstk13.mtx                # loading matrix from file
  *      $ ./cg --matrix bcsstk13.mtx > /dev/null    # ignoring solution
  *	$ ./cg < bcsstk13.mtx > /dev/null           # loading matrix from stdin
  *      $  zcat matrix.mtx.gz | ./cg                # loading gziped matrix from
@@ -223,7 +212,6 @@ void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y)
 
 void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y_local,int taille_loc, int debut)
 {
-	int n = A->n;
 	int *Ap = A->Ap;
 	int *Aj = A->Aj;
 	double *Ax = A->Ax;
@@ -267,9 +255,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 {
 	int n = A->n; /// length of matrix
 	int nz = A->nz; //number of non zeros
-	//int *row_ptr=A->Ap; // row indices
-	//int *indice_col=A->Aj; // column indices
-	//double *valeur_mat=A->Ax; //coefficientmak
+
 
 	if(my_rank==0){
 	fprintf(stderr, "[CG] Starting iterative solver\n");
@@ -279,12 +265,10 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 
 
-	/////////////////ETAPE 1////
-
 
 	// Vector size and displacement for each processor
-	int* taille_local=malloc(total*sizeof(int));
-	int* deplac_local=malloc(total*sizeof(int));
+	int *taille_local=malloc(total*sizeof(int));
+	int *deplac_local=malloc(total*sizeof(int));
 	for(int i=0; i<total;i++){
 		taille_local[i] = (i+1)*n/total- i*n/total;
 		deplac_local[i] = i*n/total;
@@ -295,7 +279,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 	int taille_loc=	taille_local[my_rank];
 	int debut=deplac_local[my_rank];
-	int fin=taille_local[my_rank]+deplac_local[my_rank];
+	int fin=deplac_local[my_rank]+taille_local[my_rank];
 	/////Les matrice local à utiliser
 	double *r_local = malloc(taille_loc*sizeof(double));	        // residue
 	double *z_local = malloc(taille_loc*sizeof(double));	// preconditioned-residue
@@ -318,6 +302,8 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 	for (int i =debut ; i < fin; i++)	// r <-- b - Ax == b
 		r_local[i-debut] = b[i];
+	for (int i = debut; i < fin; i++)	// p <-- z
+		p_local[i-debut] = p[i];
 	for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
 		z_local[i-debut] = r_local[i-debut] / d[i];
 	for (int i = debut; i < fin; i++)	// p <-- z
@@ -328,9 +314,9 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 
 	double erreur_local=norm(taille_loc,r_local);
-	double erreur=0.0;
-	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-	erreur=sqrt(erreur);
+	double erreur2=0.0;
+	MPI_Allreduce(&erreur_local,&erreur2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+	double erreur=sqrt(erreur);
 
 	double start = wtime();
 	double last_display = start;
@@ -340,6 +326,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		double old_rz = rz;
 
 		sp_gemv_mpi(A, p, q_local,taille_loc,debut);	/* q <-- A.p */
+
 		double dot=0.0;
 		double local = dot_local(taille_loc, p_local, q_local);
 		MPI_Allreduce(&local,&dot,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
@@ -368,12 +355,12 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		double t = wtime();
 
 		erreur_local=norm(taille_loc, r_local);
-		erreur=0.0;
-		MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-		erreur=sqrt(erreur);
+		erreur2=0.0;
+		MPI_Allreduce(&erreur_local,&erreur2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		erreur=sqrt(erreur2);
 
-		if (my_rank==0) {
-		if (t - last_display > 0.5) {
+
+		if (t - last_display > 0.5 && my_rank==0) {
 			/* verbosity */
 			double rate = iter / (t - start);	// iterations per s.
 			double GFLOPs = 1e-9 * rate * (2 * nz + 12 * n);
@@ -381,7 +368,6 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 			fflush(stdout);
 			last_display = t;
 		}
-	}
 	MPI_Allgatherv(x_local,taille_loc,MPI_DOUBLE,x,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
 	}
 	if (my_rank==0) {
@@ -407,7 +393,7 @@ struct option longopts[6] = {
 int main(int argc, char **argv)
 {
 	/* Initializing MPI */
-	int my_rank, total, source, dest, tag = 0;
+	int my_rank, total;
 
     //initialisation
 
@@ -456,7 +442,7 @@ int main(int argc, char **argv)
 
 	/* Allocate memory */
 	int n = A->n;
-	double *mem = malloc(7 * n * sizeof(double));
+	double *mem = malloc(4 * n * sizeof(double));
 	if (mem == NULL)
 		err(1, "cannot allocate dense vectors");
 	double *x = mem;	/* solution vector */
@@ -468,6 +454,7 @@ int main(int argc, char **argv)
 		FILE *f_b = fopen(rhs_filename, "r");
 		if (f_b == NULL)
 			err(1, "cannot open %s", rhs_filename);
+		if(my_rank==0)
 		fprintf(stderr, "[IO] Loading b from %s\n", rhs_filename);
 		for (int i = 0; i < n; i++) {
 			if (1 != fscanf(f_b, "%lg\n", &b[i]))
