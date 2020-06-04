@@ -88,9 +88,10 @@ struct csr_matrix_t *load_mm(FILE * f)
 		errx(1, "Matrix type [%s] not supported (only real symmetric are OK)", mm_typecode_to_str(matcode));
 	if (mm_read_mtx_crd_size(f, &n, &m, &nnz) != 0)
 		errx(1, "Cannot read matrix size");
+	if(my_rank==0){
 	fprintf(stderr, "[IO] Loading [%s] %d x %d with %d nz in triplet format\n", mm_typecode_to_str(matcode), n, n, nnz);
 	fprintf(stderr, "     ---> for this, I will allocate %.1f MByte\n", 1e-6 * (40.0 * nnz + 8.0 * n));
-
+	}
 	/* Allocate memory for the COOrdinate representation of the matrix (lower-triangle only) */
 	int *Ti = malloc(nnz * sizeof(*Ti));
 	int *Tj = malloc(nnz * sizeof(*Tj));
@@ -115,8 +116,9 @@ struct csr_matrix_t *load_mm(FILE * f)
 	}
 
 	double stop = wtime();
+	if(my_rank==0){}
 	fprintf(stderr, "     ---> loaded in %.1fs\n", stop - start);
-
+}
 	/* -------- STEP 2: Convert to CSR (compressed sparse row) representation ----- */
 	start = wtime();
 
@@ -174,9 +176,11 @@ struct csr_matrix_t *load_mm(FILE * f)
 	free(Tj);
 	free(Tx);
 	stop = wtime();
+	if (my_rank==0) {
+		/* code */
 	fprintf(stderr, "     ---> converted to CSR format in %.1fs\n", stop - start);
 	fprintf(stderr, "     ---> CSR matrix size = %.1fMbyte\n", 1e-6 * (24. * nnz + 4. * n));
-
+}
 	A->n = n;
 	A->nz = sum;
 	A->Ap = Ap;
@@ -311,28 +315,6 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		taille_local[i] = taille;
 		deplac_local[i] = i*taille;
 	}
-	////// Pour la matrice
-	/*int taille_mat[total]; int depla_mat[total];
-		for (int p = 0; p < total; p++) {
-			taille_mat[p] = row_ptr[p*taille+deplac_local[p]] - row_ptr[p*taille];
-			depla_mat[p] = row_ptr[p*taille];
-		}
-	//////////ENVOIE AUX AUTRES
-	MPI_Scatter(taille_mat,1,MPI_INT,&myNumE,1,MPI_INT,0,MPI_COMM_WORLD);
-	int *rowptr_local = (int *)malloc(sizeof(int) * (vSize+1));
-	MPI_Scatterv(row_ptr,taille_local,deplac_local,MPI_INT,
-		rowptr_local,vSize,MPI_INT,0,MPI_COMM_WORLD);*/
-
-
-	//int *col_local = (int *)malloc(sizeof(int) * myNumE);
-	//MPI_Scatterv(indice_col,taille_local,deplac_loca,MPI_INT,
-	//		col_local,myNumE,MPI_INT,0,MPI_COMM_WORLD);
-
-	//double *mat_val_local = (double *)malloc(sizeof(double) * myNumE);
-	//MPI_Scatterv(valeur_mat,taille_local,deplac_loca,MPI_DOUBLE,
-	//mat_val_local,myNumE,MPI_DOUBLE,0,MPI_COMM_WORLD);
-
-
 
 
 	//////////// ON GARDE P ET D
@@ -350,6 +332,8 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double *p_local = malloc(taille*sizeof(double));	// search direction
 	double *q_local = malloc(taille*sizeof(double));	// q == Ap
 	double *x_local = malloc(taille*sizeof(double));
+
+
 	/* We use x == 0 --- this avoids the first matrix-vector product.*/
 	//On supprime x car pas besoin
 	for (int i = 0; i < n; i++)
@@ -357,6 +341,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 	int debut=my_rank*taille;
 	int fin=(my_rank+1)*taille;
+	fprintf(stderr,"!###  Noeud(%d) : de %d à %d : taille %d \n",my_rank,debut,fin,taille);
 	for (int i =debut ; i < fin; i++)	// r <-- b - Ax == b
 		r_local[i-debut] = b[i];
 	for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
@@ -381,9 +366,9 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		double dot=0.0;
 		double local = dot_local(taille, p_local, q_local);
 		MPI_Allreduce(&local,&dot,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-		
+
 		double alpha = old_rz / dot;
-		
+
 		for (int i = debut; i < fin; i++)	// x <-- x + alpha*p
 			x_local[i-debut] += alpha * p_local[i-debut];
 		for (int i = debut; i < fin; i++){	// r <-- r - alpha*q
@@ -397,7 +382,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 		for (int i = debut; i < fin; i++)	// p <-- z + beta*p
 			p_local[i] = z_local[i] + beta * p_local[i];
-		
+
 		///On rassemble p car on en a besoin pour le produit matrice
 		MPI_Allgatherv(p_local,fin-debut, MPI_DOUBLE,p,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
 		iter++;
