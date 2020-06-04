@@ -389,7 +389,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 		for (int i = debut; i < fin; i++)	// p <-- z + beta*p
 			p_local[i] = z_local[i] + beta * p_local[i];
-
+			fprintf(stderr,"l'erreur est en bas")
 		///On rassemble p car on en a besoin pour le produit matrice
 		MPI_Allgatherv(p_local,fin-debut, MPI_DOUBLE,p,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
 		iter++;
