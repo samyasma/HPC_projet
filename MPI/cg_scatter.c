@@ -71,7 +71,7 @@ double PRF(int i, unsigned long long seed)
 /*************************** Matrix IO ****************************************/
 
 /* Load MatrixMarket sparse symetric matrix from the file descriptor f */
-struct csr_matrix_t *load_mm(FILE * f)
+struct csr_matrix_t *load_mm(FILE * f,int my_rank)
 {
 	MM_typecode matcode;
 	int n, m, nnz;
@@ -116,7 +116,7 @@ struct csr_matrix_t *load_mm(FILE * f)
 	}
 
 	double stop = wtime();
-	if(my_rank==0){}
+	if(my_rank==0){
 	fprintf(stderr, "     ---> loaded in %.1fs\n", stop - start);
 }
 	/* -------- STEP 2: Convert to CSR (compressed sparse row) representation ----- */
@@ -176,11 +176,10 @@ struct csr_matrix_t *load_mm(FILE * f)
 	free(Tj);
 	free(Tx);
 	stop = wtime();
-	if (my_rank==0) {
-		/* code */
+	if (my_rank==0){
 	fprintf(stderr, "     ---> converted to CSR format in %.1fs\n", stop - start);
 	fprintf(stderr, "     ---> CSR matrix size = %.1fMbyte\n", 1e-6 * (24. * nnz + 4. * n));
-}
+	}
 	A->n = n;
 	A->nz = sum;
 	A->Ap = Ap;
@@ -472,7 +471,7 @@ int main(int argc, char **argv)
 		if (f_mat == NULL)
 			err(1, "cannot matrix file %s", matrix_filename);
 	}
-	struct csr_matrix_t *A = load_mm(f_mat);
+	struct csr_matrix_t *A = load_mm(f_mat,my_rank);
 
 	/* Allocate memory */
 	int n = A->n;
