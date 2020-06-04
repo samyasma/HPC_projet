@@ -311,7 +311,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	int* taille_local=malloc(total*sizeof(int));
 	int* deplac_local=malloc(total*sizeof(int));
 	for(int i=0; i<total;i++){
-		taille_local[i] = taille;
+		taille_local[i] = (i+1)*taille-i*taille;
 		deplac_local[i] = i*taille;
 	}
 
@@ -323,14 +323,16 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	/* Isolate diagonal */
 	extract_diagonal(A, d);
 
-
+	int taille_loc=	taille_local[my_rank];
+	int debut=deplac_local[my_rank];
+	int fin=taille_local[my_rank]+deplac_local[my_rank];
 
 	/////Les matrice local à utiliser
-	double *r_local = malloc(taille*sizeof(double));	        // residue
-	double *z_local = malloc(taille*sizeof(double));	// preconditioned-residue
-	double *p_local = malloc(taille*sizeof(double));	// search direction
-	double *q_local = malloc(taille*sizeof(double));	// q == Ap
-	double *x_local = malloc(taille*sizeof(double));
+	double *r_local = malloc(taille_loc*sizeof(double));	        // residue
+	double *z_local = malloc(taille_loc*sizeof(double));	// preconditioned-residue
+	double *p_local = malloc(taille_loc*sizeof(double));	// search direction
+	double *q_local = malloc(taille_loc*sizeof(double));	// q == Ap
+	double *x_local = malloc(taille_loc*sizeof(double));
 
 
 	/* We use x == 0 --- this avoids the first matrix-vector product.*/
@@ -338,9 +340,8 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	for (int i = 0; i < n; i++)
 		p[i] = b[i]/d[i];
 
-	int debut=my_rank*taille;
-	int fin=(my_rank+1)*taille;
-	fprintf(stderr,"!###  Noeud(%d) : de %d à %d : taille %d \n",my_rank,debut,fin,taille);
+
+	fprintf(stderr,"!###  Noeud(%d) : de %d à %d : taille %d \n",my_rank,debut,fin,taille_loc);
 	for (int i =debut ; i < fin; i++)	// r <-- b - Ax == b
 		r_local[i-debut] = b[i];
 	for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
@@ -349,12 +350,12 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		p_local[i] = z_local[i];
 
 	double rz=0.0;
-	double rz_local = dot_local(taille, r_local, z_local);
+	double rz_local = dot_local(taille_loc, r_local, z_local);
 	MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 	double start = wtime();
 	double last_display = start;
 	int iter = 0;
-	double erreur_local=dot_local(taille, r_local, r_local);
+	double erreur_local=dot_local(taille_loc, r_local, r_local);
 	double erreur=0.0;
 	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 	erreur=sqrt(erreur);
@@ -363,7 +364,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		double old_rz = rz;
 		sp_gemv_mpi(A, p, q_local,my_rank,total);	/* q <-- A.p */
 		double dot=0.0;
-		double local = dot_local(taille, p_local, q_local);
+		double local = dot_local(taille_loc, p_local, q_local);
 		MPI_Allreduce(&local,&dot,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 
 		double alpha = old_rz / dot;
@@ -387,7 +388,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		iter++;
 		double t = wtime();
 
-		erreur_local=dot_local(taille, r_local, r_local);
+		erreur_local=dot_local(taille_loc, r_local, r_local);
 		erreur=0.0;
 		MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		erreur=sqrt(erreur);
@@ -401,7 +402,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 			last_display = t;
 		}
 	}
-	MPI_Allgatherv(x_local,taille,MPI_DOUBLE,x,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
+	MPI_Allgatherv(x_local,taille_loc,MPI_DOUBLE,x,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
 	}
 	if (my_rank==0) {
 		fprintf(stderr, "\n     ---> Finished in %.1fs and %d iterations\n", wtime() - start, iter);
