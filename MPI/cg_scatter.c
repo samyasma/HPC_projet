@@ -222,16 +222,14 @@ void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y)
 	}
 }
 
-void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y_local,int my_rank, int total)
+void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y_local,int taille_loc, int debut)
 {
 	int n = A->n;
 	int *Ap = A->Ap;
 	int *Aj = A->Aj;
 	double *Ax = A->Ax;
 
-	int debut = (my_rank*n)/total;
-	int fin=((my_rank+1)*n)/total;
-	for (int i = debut; i < fin; i++) {
+	for (int i = debut; i < debut+taille_loc; i++) {
 		y_local[i-debut] = 0;
 		for (int u = Ap[i]; u < Ap[i + 1]; u++) {
 			int j = Aj[u];
@@ -351,17 +349,20 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double rz=0.0;
 	double rz_local = dot_local(taille_loc, r_local, z_local);
 	MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+
 	double start = wtime();
 	double last_display = start;
 	int iter = 0;
+
 	double erreur_local=dot_local(taille_loc, r_local, r_local);
 	double erreur=0.0;
 	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-	erreur=sqrt(sqrt(erreur));
+	erreur=sqrt(erreur);
+
 	while (erreur > epsilon) {
 		/* loop invariant : rz = dot(r, z) */
 		double old_rz = rz;
-		sp_gemv_mpi(A, p, q_local,my_rank,total);	/* q <-- A.p */
+		sp_gemv_mpi(A, p, q_local,taille_loc,debut);	/* q <-- A.p */
 		double dot=0.0;
 		double local = dot_local(taille_loc, p_local, q_local);
 		MPI_Allreduce(&local,&dot,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
@@ -390,7 +391,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		erreur_local=dot_local(taille_loc, r_local, r_local);
 		erreur=0.0;
 		MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-		erreur=sqrt(sqrt(erreur));
+		erreur=sqrt(erreur);
 		if (my_rank==0) {
 		if (t - last_display > 0.5) {
 			/* verbosity */
