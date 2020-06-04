@@ -301,8 +301,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 
 	/////////////////ETAPE 1////
-	////DISTRIBUTION DES VECTEURS////
-	int taille = n / total; //partial vector size for each
+	////DISTRIBUTION DES VECTEURS////h
 	//if (my_rank == total-1) {
 	//	taille = n - (total-1)*taille;
 	//}
@@ -311,8 +310,8 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	int* taille_local=malloc(total*sizeof(int));
 	int* deplac_local=malloc(total*sizeof(int));
 	for(int i=0; i<total;i++){
-		taille_local[i] = (i+1)*taille-i*taille;
-		deplac_local[i] = i*taille;
+		taille_local[i] = (i+1)*n/total- i*n/total;
+		deplac_local[i] = i*n/total;
 	}
 
 
