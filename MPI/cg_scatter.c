@@ -253,7 +253,6 @@ double dot_local(const int n, const double *x, const double *y)
 }
 
 
-
 /* euclidean norm (a.k.a 2-norm) */
 double norm(const int n, const double *x)
 {
@@ -292,6 +291,19 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	}
 
 
+
+
+	int taille_loc=	taille_local[my_rank];
+	int debut=deplac_local[my_rank];
+	int fin=taille_local[my_rank]+deplac_local[my_rank];
+	/////Les matrice local à utiliser
+	double *r_local = malloc(taille_loc*sizeof(double));	        // residue
+	double *z_local = malloc(taille_loc*sizeof(double));	// preconditioned-residue
+	double *p_local = malloc(taille_loc*sizeof(double));	// search direction
+	double *q_local = malloc(taille_loc*sizeof(double));	// q == Ap
+	double *x_local = malloc(taille_loc*sizeof(double));
+	fprintf(stderr,"!###  Noeud(%d) : de %d à %d : taille %d \n",my_rank,debut,fin,taille_loc);
+
 	//////////// ON GARDE P ET D
 	double *p = scratch ;	// search direction
 	double *d = scratch +n;	// diagonal entries of A (Jacobi preconditioning)
@@ -299,18 +311,6 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	/* Isolate diagonal */
 	extract_diagonal(A, d);
 
-	int taille_loc=	taille_local[my_rank];
-	int debut=deplac_local[my_rank];
-	int fin=taille_local[my_rank]+deplac_local[my_rank];
-
-	/////Les matrice local à utiliser
-	double *r_local = malloc(taille_loc*sizeof(double));	        // residue
-	double *z_local = malloc(taille_loc*sizeof(double));	// preconditioned-residue
-	double *p_local = malloc(taille_loc*sizeof(double));	// search direction
-	double *q_local = malloc(taille_loc*sizeof(double));	// q == Ap
-	double *x_local = malloc(taille_loc*sizeof(double));
-
-	fprintf(stderr,"!###  Noeud(%d) : de %d à %d : taille %d \n",my_rank,debut,fin,taille_loc);
 	/* We use x == 0 --- this avoids the first matrix-vector product.*/
 	//On supprime x car pas besoin
 	for (int i = 0; i < n; i++)
@@ -323,19 +323,18 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	for (int i = debut; i < fin; i++)	// p <-- z
 		p_local[i-debut] = p[i];
 
-	double rz=0.0;
+	double rz;
 	double rz_local = dot_local(taille_loc, r_local, z_local);
 	MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-
-	double start = wtime();
-	double last_display = start;
-	int iter = 0;
 
 	double erreur_local=norm(taille_loc,r_local);
 	double erreur=0.0;
 	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 	erreur=sqrt(erreur);
 
+	double start = wtime();
+	double last_display = start;
+	int iter = 0;
 	while (erreur > epsilon) {
 		/* loop invariant : rz = dot(r, z) */
 		double old_rz = rz;
@@ -364,7 +363,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 			p_local[i-debut] = z_local[i-debut] + beta * p_local[i-debut];
 
 		///On rassemble p car on en a besoin pour le produit matrice
-		MPI_Allgatherv(p_local,fin-debut, MPI_DOUBLE,p,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
+		MPI_Allgatherv(p_local,taille_loc, MPI_DOUBLE,p,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
 		iter++;
 		double t = wtime();
 
