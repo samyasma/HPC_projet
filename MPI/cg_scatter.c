@@ -344,7 +344,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
 		z_local[i-debut] = r_local[i-debut] / d[i];
 	for (int i = debut; i < fin; i++)	// p <-- z
-		p_local[i] = z_local[i];
+		p_local[i] = p[i];
 
 	double rz=0.0;
 	double rz_local = dot_local(taille_loc, r_local, z_local);
