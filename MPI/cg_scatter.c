@@ -31,7 +31,6 @@
 #include "mmio.h"
 #define SIZE_H_N 50
 #define THRESHOLD 1e-8		// maximum tolerance threshold
-#define min(a,b) (a<=b?a:b)
 struct csr_matrix_t {
 	int n;			// dimension
 	int nz;			// number of non-zero entries
@@ -253,29 +252,12 @@ double dot_local(const int n, const double *x, const double *y)
 	return sum;
 }
 
-double dot_mpi(const int n, const double *x, const double *y,int my_rank,int total)
-{
-	double sum = 0.0;
-	int debut = (my_rank*n)/total;
-	int fin= ((my_rank+1)*n)/total;
-	double temp=0.0;
-	for (int i = debut; i < fin; i++){
-		temp += x[i] * y[i];
-	}
-	MPI_Allreduce(&temp,&sum,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-	return sum;
-}
 
 
 /* euclidean norm (a.k.a 2-norm) */
 double norm(const int n, const double *x)
 {
 	return sqrt(dot_local(n, x, x));
-}
-
-double norm_mpi(const int n, const double *x,int my_rank,int total)
-{
-	return sqrt(dot_mpi(n, x, x, my_rank,total));
 }
 
 
@@ -299,10 +281,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 
 	/////////////////ETAPE 1////
-	////DISTRIBUTION DES VECTEURS////h
-	//if (my_rank == total-1) {
-	//	taille = n - (total-1)*taille;
-	//}
+
 
 	// Vector size and displacement for each processor
 	int* taille_local=malloc(total*sizeof(int));
@@ -331,14 +310,12 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double *q_local = malloc(taille_loc*sizeof(double));	// q == Ap
 	double *x_local = malloc(taille_loc*sizeof(double));
 
-
+	fprintf(stderr,"!###  Noeud(%d) : de %d à %d : taille %d \n",my_rank,debut,fin,taille_loc);
 	/* We use x == 0 --- this avoids the first matrix-vector product.*/
 	//On supprime x car pas besoin
 	for (int i = 0; i < n; i++)
 		p[i] = b[i]/d[i];
 
-
-	fprintf(stderr,"!###  Noeud(%d) : de %d à %d : taille %d \n",my_rank,debut,fin,taille_loc);
 	for (int i =debut ; i < fin; i++)	// r <-- b - Ax == b
 		r_local[i-debut] = b[i];
 	for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
@@ -354,7 +331,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double last_display = start;
 	int iter = 0;
 
-	double erreur_local=dot_local(taille_loc, r_local,r_local);
+	double erreur_local=norm(taille_loc,r_local);
 	double erreur=0.0;
 	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 	erreur=sqrt(erreur);
@@ -391,7 +368,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		iter++;
 		double t = wtime();
 
-		erreur_local=dot_local(taille_loc, r_local, r_local);
+		erreur_local=norm(taille_loc, r_local);
 		erreur=0.0;
 		MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		erreur=sqrt(erreur);

@@ -1,4 +1,4 @@
-* 	$ ./cg --matrix bcsstk13.mtx                # loading matrix from file
+/* 	$ ./cg --matrix bcsstk13.mtx                # loading matrix from file
 *      $ ./cg --matrix bcsstk13.mtx > /dev/null    # ignoring solution
 *	$ ./cg < bcsstk13.mtx > /dev/null           # loading matrix from stdin
 *      $  zcat matrix.mtx.gz | ./cg                # loading gziped matrix from
@@ -323,7 +323,7 @@ void cg_solve(const struct csr_matrix_t *A, const double *b, double *x, const do
  // !# On parrallélise la somme pour éviter d'avoir à récupérer r et z en entier
  double rz;
  double rz_local = dot(n_local,r_local,z_local);
- MPI_Allreduce( &rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+ MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 
 
  // !# Idem pour r
