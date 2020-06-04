@@ -287,7 +287,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	int nz = A->nz; //number of non zeros
 	int *row_ptr=A->Ap; // row indices
 	int *indice_col=A->Aj; // column indices
-	double *valeur_mat=A->Ax; //coefficient
+	double *valeur_mat=A->Ax; //coefficientmak
 
 	if(my_rank==0){
 	fprintf(stderr, "[CG] Starting iterative solver\n");
