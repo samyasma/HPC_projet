@@ -220,7 +220,7 @@ void sp_gemv(const struct csr_matrix_t *A, const double *x, double *y)
 			y[i] += A_ij * x[j];
 		}
 	}
-
+}
 void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y_local,int taille_loc, int debut)
 {
 	int n = A->n;
