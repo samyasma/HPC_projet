@@ -354,7 +354,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double last_display = start;
 	int iter = 0;
 
-	double erreur_local=dot_local(taille_loc, r_local, r_local);
+	double erreur_local=dot_local(taille_loc, r_local,r_local);
 	double erreur=0.0;
 	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 	erreur=sqrt(erreur);
@@ -362,6 +362,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	while (erreur > epsilon) {
 		/* loop invariant : rz = dot(r, z) */
 		double old_rz = rz;
+
 		sp_gemv_mpi(A, p, q_local,taille_loc,debut);	/* q <-- A.p */
 		double dot=0.0;
 		double local = dot_local(taille_loc, p_local, q_local);
@@ -370,18 +371,20 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		double alpha = old_rz / dot;
 
 		for (int i = debut; i < fin; i++)	// x <-- x + alpha*p
-			x_local[i-debut] += alpha * p_local[i-debut];
-		for (int i = debut; i < fin; i++){	// r <-- r - alpha*q
-			r_local[i-debut] -= alpha * q_local[i-debut];}
-		for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
-			z_local[i-debut] = r_local[i-debut] / d[i];
+			x_local[i-debut] =x_local[i-debut]+ alpha * p_local[i-debut];
 
-		double rz_local=dot_local(n, r_local, z_local);
+		for (int i = debut; i < fin; i++){	// r <-- r - alpha*q
+			r_local[i-debut]= r_local[i-debut]- alpha * q_local[i-debut];}
+
+		for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
+			z_local[i-debut] =  r_local[i-debut] / d[i];
+
+		rz_local=dot_local(n, r_local, z_local);
 		MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		double beta = rz / old_rz;
 
 		for (int i = debut; i < fin; i++)	// p <-- z + beta*p
-			p_local[i] = z_local[i] + beta * p_local[i];
+			p_local[i-debut] = z_local[i-debut] + beta * p_local[i-debut];
 
 		///On rassemble p car on en a besoin pour le produit matrice
 		MPI_Allgatherv(p_local,fin-debut, MPI_DOUBLE,p,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
@@ -392,6 +395,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		erreur=0.0;
 		MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		erreur=sqrt(erreur);
+
 		if (my_rank==0) {
 		if (t - last_display > 0.5) {
 			/* verbosity */
