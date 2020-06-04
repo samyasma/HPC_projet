@@ -227,7 +227,7 @@ void sp_gemv_mpi(const struct csr_matrix_t *A, const double *x, double *y_local,
 	double *Ax = A->Ax;
 
 	int debut = (my_rank*n)/total;
-	int fin= min(n,((my_rank+1)*n)/total);
+	int fin=((my_rank+1)*n)/total;
 	for (int i = debut; i < fin; i++) {
 		y_local[i-debut] = 0;
 		for (int u = Ap[i]; u < Ap[i + 1]; u++) {
@@ -256,7 +256,7 @@ double dot_mpi(const int n, const double *x, const double *y,int my_rank,int tot
 {
 	double sum = 0.0;
 	int debut = (my_rank*n)/total;
-	int fin= min(n,((my_rank+1)*n)/total);
+	int fin= ((my_rank+1)*n)/total;
 	double temp=0.0;
 	for (int i = debut; i < fin; i++){
 		temp += x[i] * y[i];
@@ -299,16 +299,18 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 	/////////////////ETAPE 1////
 	////DISTRIBUTION DES VECTEURS////
-	int taille = ceil((double)n / total); //partial vector size for each
-	if (my_rank == total-1) {
-		taille = n - (total-1)*taille;
-	}
+	int taille = n / total; //partial vector size for each
+	//if (my_rank == total-1) {
+	//	taille = n - (total-1)*taille;
+	//}
 
 	// Vector size and displacement for each processor
-	int taille_local[total],deplac_local[total];
-	taille_local[my_rank] = taille;
-	deplac_local[my_rank] = my_rank*taille;
-
+	int* taille_local=malloc(total*sizeof(int));
+	int* deplac_local=malloc(total*sizeof(int));
+	for(int i=0; i<total;i++){
+		taille_local[i] = taille;
+		deplac_local[i] = i*taille;
+	}
 	////// Pour la matrice
 	/*int taille_mat[total]; int depla_mat[total];
 		for (int p = 0; p < total; p++) {
@@ -334,8 +336,8 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 
 	//////////// ON GARDE P ET D
-	double *p = scratch + 2 * n;	// search direction
-	double *d = scratch + 4 * n;	// diagonal entries of A (Jacobi preconditioning)
+	double *p = scratch ;	// search direction
+	double *d = scratch +n;	// diagonal entries of A (Jacobi preconditioning)
 
 	/* Isolate diagonal */
 	extract_diagonal(A, d);
@@ -350,6 +352,9 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double *x_local = malloc(taille*sizeof(double));
 	/* We use x == 0 --- this avoids the first matrix-vector product.*/
 	//On supprime x car pas besoin
+	for (int i = 0; i < n; i++)
+		p[i] = b[i]/d[i];
+
 	int debut=my_rank*taille;
 	int fin=(my_rank+1)*taille;
 	for (int i =debut ; i < fin; i++)	// r <-- b - Ax == b
@@ -376,27 +381,30 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		double dot=0.0;
 		double local = dot_local(taille, p_local, q_local);
 		MPI_Allreduce(&local,&dot,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		
 		double alpha = old_rz / dot;
+		
 		for (int i = debut; i < fin; i++)	// x <-- x + alpha*p
 			x_local[i-debut] += alpha * p_local[i-debut];
-		for (int i = debut; i < fin; i++)	// r <-- r - alpha*q
-			r_local[i-debut] -= alpha * q_local[i-debut];
+		for (int i = debut; i < fin; i++){	// r <-- r - alpha*q
+			r_local[i-debut] -= alpha * q_local[i-debut];}
 		for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
 			z_local[i] = r_local[i] / d[i];
+
 		double rz_local=dot_local(n, r_local, z_local);
 		MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		double beta = rz / old_rz;
 
 		for (int i = debut; i < fin; i++)	// p <-- z + beta*p
 			p_local[i] = z_local[i] + beta * p_local[i];
-			fprintf(stderr,"l'erreur est en bas")
+		
 		///On rassemble p car on en a besoin pour le produit matrice
 		MPI_Allgatherv(p_local,fin-debut, MPI_DOUBLE,p,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
 		iter++;
 		double t = wtime();
 
-		double erreur_local=dot_local(taille, r_local, r_local);
-		double erreur=0.0;
+		erreur_local=dot_local(taille, r_local, r_local);
+		erreur=0.0;
 		MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		erreur=sqrt(erreur);
 		if (my_rank==0) {
