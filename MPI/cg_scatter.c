@@ -357,7 +357,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double erreur_local=dot_local(taille_loc, r_local, r_local);
 	double erreur=0.0;
 	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-	erreur=sqrt(erreur);
+	erreur=sqrt(sqrt(erreur));
 	while (erreur > epsilon) {
 		/* loop invariant : rz = dot(r, z) */
 		double old_rz = rz;
@@ -390,7 +390,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		erreur_local=dot_local(taille_loc, r_local, r_local);
 		erreur=0.0;
 		MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-		erreur=sqrt(erreur);
+		erreur=sqrt(sqrt(erreur));
 		if (my_rank==0) {
 		if (t - last_display > 0.5) {
 			/* verbosity */
