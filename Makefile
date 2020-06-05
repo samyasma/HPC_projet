@@ -6,7 +6,7 @@ CFLAGS = -O3 -Wall -Wextra -g -fopenmp
 LDLIBS = -lm -fopenmp
 USE_OMP = -DUSING_OMP
 
-all :clean Hybride/cg_openmp_mpi MPI/cg_scatter OpenMP/cg_openmp
+all :clean Hybride/cg_openmp_mpi MPI/cg_scatter OpenMP/cg_openmp sequential/cg
 
 Hybride/cg_openmp_mpi : Hybride/cg_openmp_mpi.o Hybride/mmio.o
 Hybride/mmio.o : Hybride/mmio.c Hybride/mmio.h
@@ -20,7 +20,11 @@ OpenMP/cg_openmp : OpenMP/cg_openmp.o OpenMP/mmio.o
 OpenMP/mmio.o : OpenMP/mmio.c OpenMP/mmio.h
 OpenMP/cg_openmp.o : OpenMP/cg_openmp.c OpenMP/mmio.h
 
+sequential/cg : sequential/cg.o sequential/mmio.o
+sequential/mmio.o : sequential/mmio.c sequential/mmio.h
+sequential/cg.o : sequential/cg.c sequential/mmio.h
+
 
 .PHONY: clean
 clean :
-	rm -rf Hybride/*.o  MPI/*.o OpenMP/*.o Hybride/cg_openmp_mpi MPI/cg_scatter OpenMP/cg_openmp
+	rm -rf Hybride/*.o  MPI/*.o OpenMP/*.o sequential/*.o Hybride/cg_openmp_mpi MPI/cg_scatter OpenMP/cg_openmp sequential/cg
