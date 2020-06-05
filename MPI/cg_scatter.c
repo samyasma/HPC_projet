@@ -316,7 +316,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double erreur_local=norm(taille_loc,r_local);
 	double erreur2=0.0;
 	MPI_Allreduce(&erreur_local,&erreur2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-	double erreur=sqrt(erreur);
+	double erreur=sqrt(erreur2);
 
 	double start = wtime();
 	double last_display = start;
@@ -358,7 +358,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		erreur2=0.0;
 		MPI_Allreduce(&erreur_local,&erreur2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		erreur=sqrt(erreur2);
-
+ls
 
 		if (t - last_display > 0.5 && my_rank==0) {
 			/* verbosity */
