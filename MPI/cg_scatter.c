@@ -358,7 +358,6 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		erreur2=0.0;
 		MPI_Allreduce(&erreur_local,&erreur2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		erreur=sqrt(erreur2);
-ls
 
 		if (t - last_display > 0.5 && my_rank==0) {
 			/* verbosity */
