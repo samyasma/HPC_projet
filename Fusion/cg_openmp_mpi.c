@@ -16,8 +16,8 @@
   *      $ ./cg --no-check < bcsstk13.mtx            # no safety check
   *
   * PRO-TIP :
-  *      # downloading and uncompressing the matrix on the fly
-  *	$ curl --silent https://hpc.fil.cool/matrix/bcsstk13.mtx.gz | zcat | ./cg
+  *     # downloading and uncompressing the matrix on the fly
+  *	$ // curl --silent https://hpc.fil.cool/matrix/bcsstk13.mtx.gz | zcat | ./cg
   */
  #include <stdio.h>
  #include <stdlib.h>

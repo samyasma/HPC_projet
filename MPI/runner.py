@@ -18,15 +18,15 @@ params['proof'] = 0x65dec1542f679f51
 # Paramètres du calcul (à adapter)
 
 
-params['matrix'] = "parabolic_fem"
+params['matrix'] = "hood"
 params['users'] = ["Samy ASMA"]
 
 # Description du code exécuté
 params['software'] = """Code MPI."""
 
 # Description du matériel utilisé pour l'exécution
-params['nodes'] = 2   # nombre de noeuds
-params['cores'] = 4   # nombre total de coeurs
+params['nodes'] = 10   # nombre de noeuds
+params['cores'] = 10   # nombre total de coeurs
 params['hardware'] = """4 PCs de la Salle 327 (Esclangon).
 Machines de bureau DELL équipés de CPU Intel i3 à 2 coeurs, 3Ghz, et 4Go de RAM."""
 
@@ -38,7 +38,7 @@ Machines de bureau DELL équipés de CPU Intel i3 à 2 coeurs, 3Ghz, et 4Go de R
 #   On peut ajouter toutes les options qu'on veut, utiliser mpiexec, etc.
 #command_line = "./cg --matrix {matrix}.mtx --seed {seed}"
 #command_line = "zcat matrices/{matrix}.mtx.gz | ./cg --seed {seed}"
-command_line = "mpiexec --n 4 --hostfile hostfile --display-map zcat /Infos/lmd/2019/master/ue/MU4IN903-2020fev/{matrix}.mtx.gz | ./cg_scatter --seed {seed}"
+command_line = "mpiexec --n 2 --hostfile hostfile --map-by node --display-map ./cg_a --matrix ../Matrix/{matrix}.mtx --seed {seed}"
 #command_line = "mpiexec --n {nodes} -hostfile hostfile --map-by ppr:1:node ./cg --matrix {matrix}.mtx --seed {seed}"
 
 ######################### Main Program ###########################

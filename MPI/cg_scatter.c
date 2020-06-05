@@ -287,7 +287,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	//////////// ON GARDE P ET D
 	double *p = scratch ;	// search direction
 	double *d = scratch +n;	// diagonal entries of A (Jacobi preconditioning)
-
+	fprintf(stderr,"###Pour le noeud(%d), ca va de : de %d à %d : taille %d \n",my_rank,debut,fin,taille_loc);
 	/* Isolate diagonal */
 	extract_diagonal(A, d);
 
@@ -307,10 +307,10 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double rz_local = dot_local(taille_loc, r_local, z_local);
 	MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 
-	double erreur_local=dot_local(taille_loc,r_local,r_local);
+	double erreur_local=norm(taille_loc,r_local);
 	double erreur=0.0;
 	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-  erreur=sqrt(erreur);
+  	erreur=sqrt(erreur);
 
 	double start = wtime();
 	double last_display = start;
@@ -351,7 +351,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		iter++;
 		double t = wtime();
 
-		erreur_local=dot_local(taille_loc, r_local,r_local);
+		erreur_local=norm(taille_loc, r_local);
 		erreur=0.0;
 		MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		erreur=sqrt(erreur);
