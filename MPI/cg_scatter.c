@@ -388,7 +388,6 @@ struct option longopts[6] = {
 
 int main(int argc, char **argv)
 {
-	fprintf(stderr, "ENTREE\n");
 	/* Initializing MPI */
 	int my_rank, total;
 
