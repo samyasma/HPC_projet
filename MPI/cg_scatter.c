@@ -258,7 +258,6 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 	if(my_rank==0){
 	fprintf(stderr, "[CG] Starting iterative solver\n");
-	fprintf(stderr, "     ---> Using : %d nodes\n",total);
 	fprintf(stderr, "     ---> Working set : %.1fMbyte\n", 1e-6 * (12.0 * nz + 52.0 * n));
 	fprintf(stderr, "     ---> Per iteration: %.2g FLOP in sp_gemv() and %.2g FLOP in the rest\n", 2. * nz, 12. * n);
 	}
@@ -275,8 +274,6 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	}
 
 
-
-
 	int taille_loc=	taille_local[my_rank];
 	int debut=deplac_local[my_rank];
 	int fin=deplac_local[my_rank]+taille_local[my_rank];
@@ -286,8 +283,6 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double *z_local = malloc(taille_loc*sizeof(double));	// preconditioned-residue
 	double *p_local = malloc(taille_loc*sizeof(double));	// search direction
 	double *q_local = malloc(taille_loc*sizeof(double));	// q == Ap
-
-	fprintf(stderr,"!###  Noeud(%d) : de %d à %d : taille %d \n",my_rank,debut,fin,taille_loc);
 
 	//////////// ON GARDE P ET D
 	double *p = scratch ;	// search direction
@@ -303,8 +298,6 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 	for (int i =debut ; i < fin; i++)	// r <-- b - Ax == b
 		r_local[i-debut] = b[i];
-	for (int i = debut; i < fin; i++)	// p <-- z
-		p_local[i-debut] = p[i];
 	for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
 		z_local[i-debut] = r_local[i-debut] / d[i];
 	for (int i = debut; i < fin; i++)	// p <-- z
@@ -314,10 +307,10 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double rz_local = dot_local(taille_loc, r_local, z_local);
 	MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 
-	double erreur_local=norm(taille_loc,r_local);
-	double erreur2=0.0;
-	MPI_Allreduce(&erreur_local,&erreur2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-	double erreur=sqrt(erreur2);
+	double erreur_local=dot(taille_loc,r_local,r_local);
+	double erreur=0.0;
+	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+	double erreur=sqrt(erreur);
 
 	double start = wtime();
 	double last_display = start;
@@ -337,11 +330,11 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		double alpha = old_rz / pq;
 
 		for (int i = debut; i < fin; i++){	// x <-- x + alpha*p
-			x_local[i-debut] =x_local[i-debut]+ alpha * p_local[i-debut];}
-
+			x_local[i-debut] =x_local[i-debut]+ alpha * p_local[i-debut];
+		}
 		for (int i = debut; i < fin; i++){	// r <-- r - alpha*q
-			r_local[i-debut]= r_local[i-debut]- alpha * q_local[i-debut];}
-
+			r_local[i-debut]= r_local[i-debut]- alpha * q_local[i-debut];
+		}
 		for (int i = debut; i < fin; i++){	// z <-- M^(-1).r
 			z_local[i-debut] =  r_local[i-debut] / d[i];
 		}
@@ -358,10 +351,10 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		iter++;
 		double t = wtime();
 
-		erreur_local=norm(taille_loc, r_local);
-		erreur2=0.0;
-		MPI_Allreduce(&erreur_local,&erreur2,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-		erreur=sqrt(erreur2);
+		erreur_local=dot(taille_loc, r_local,r_local);
+		erreur=0.0;
+		MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		erreur=sqrt(erreur);
 
 		if (t - last_display > 0.5 && my_rank==0) {
 			/* verbosity */
