@@ -321,6 +321,8 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double start = wtime();
 	double last_display = start;
 	int iter = 0;
+
+
 	while (erreur > epsilon) {
 		/* loop invariant : rz = dot(r, z) */
 		double old_rz = rz;
@@ -333,15 +335,15 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 		double alpha = old_rz / dot;
 
-		for (int i = debut; i < fin; i++)	// x <-- x + alpha*p
-			x_local[i-debut] =x_local[i-debut]+ alpha * p_local[i-debut];
+		for (int i = debut; i < fin; i++){	// x <-- x + alpha*p
+			x_local[i-debut] =x_local[i-debut]+ alpha * p_local[i-debut];}
 
 		for (int i = debut; i < fin; i++){	// r <-- r - alpha*q
 			r_local[i-debut]= r_local[i-debut]- alpha * q_local[i-debut];}
 
-		for (int i = debut; i < fin; i++)	// z <-- M^(-1).r
+		for (int i = debut; i < fin; i++){	// z <-- M^(-1).r
 			z_local[i-debut] =  r_local[i-debut] / d[i];
-
+		}
 		rz_local=dot_local(n, r_local, z_local);
 		MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		double beta = rz / old_rz;
@@ -368,6 +370,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 			last_display = t;
 		}
 	}
+
 	MPI_Allgatherv(x_local,taille_loc,MPI_DOUBLE,x,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
 	if (my_rank==0) {
 		fprintf(stderr, "\n     ---> Finished in %.1fs and %d iterations\n", wtime() - start, iter);
@@ -391,6 +394,7 @@ struct option longopts[6] = {
 
 int main(int argc, char **argv)
 {
+	fprintf(stderr, "ENTREE\n");
 	/* Initializing MPI */
 	int my_rank, total;
 
@@ -453,8 +457,8 @@ int main(int argc, char **argv)
 		FILE *f_b = fopen(rhs_filename, "r");
 		if (f_b == NULL)
 			err(1, "cannot open %s", rhs_filename);
-		if(my_rank==0)
-		fprintf(stderr, "[IO] Loading b from %s\n", rhs_filename);
+		if(my_rank==0){
+			fprintf(stderr, "[IO] Loading b from %s\n", rhs_filename);}
 		for (int i = 0; i < n; i++) {
 			if (1 != fscanf(f_b, "%lg\n", &b[i]))
 				errx(1, "parse error entry %d\n", i);
