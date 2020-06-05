@@ -368,8 +368,8 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 			fflush(stdout);
 			last_display = t;
 		}
-	MPI_Allgatherv(x_local,taille_loc,MPI_DOUBLE,x,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
 	}
+	MPI_Allgatherv(x_local,taille_loc,MPI_DOUBLE,x,taille_local,deplac_local,MPI_DOUBLE, MPI_COMM_WORLD);
 	if (my_rank==0) {
 		fprintf(stderr, "\n     ---> Finished in %.1fs and %d iterations\n", wtime() - start, iter);
 	}
