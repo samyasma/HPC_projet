@@ -4,6 +4,7 @@ CC = mpicc
 # Add your choice of flags
 CFLAGS = -O3 -Wall -Wextra -g -fopenmp
 LDLIBS = -lm -fopenmp
+USE_OMP = -DUSING_OMP
 
 all :clean cg_openmp_mpi
 
