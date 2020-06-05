@@ -258,6 +258,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 	if(my_rank==0){
 	fprintf(stderr, "[CG] Starting iterative solver\n");
+	fprintf(stderr, "     ---> Using : %d nodes\n",total);
 	fprintf(stderr, "     ---> Working set : %.1fMbyte\n", 1e-6 * (12.0 * nz + 52.0 * n));
 	fprintf(stderr, "     ---> Per iteration: %.2g FLOP in sp_gemv() and %.2g FLOP in the rest\n", 2. * nz, 12. * n);
 	}
@@ -329,11 +330,11 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 
 		sp_gemv_mpi(A, p, q_local,taille_loc,debut);	/* q <-- A.p */
 
-		double dot=0.0;
-		double local = dot_local(taille_loc, p_local, q_local);
-		MPI_Allreduce(&local,&dot,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
+		double pq_local = dot_local(taille_loc, p_local, q_local);
+		double pq=0.0;
+		MPI_Allreduce(&pq_local,&pq,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 
-		double alpha = old_rz / dot;
+		double alpha = old_rz / pq;
 
 		for (int i = debut; i < fin; i++){	// x <-- x + alpha*p
 			x_local[i-debut] =x_local[i-debut]+ alpha * p_local[i-debut];}
@@ -344,7 +345,8 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 		for (int i = debut; i < fin; i++){	// z <-- M^(-1).r
 			z_local[i-debut] =  r_local[i-debut] / d[i];
 		}
-		rz_local=dot_local(n, r_local, z_local);
+
+		rz_local=dot_local(taille_loc, r_local, z_local);
 		MPI_Allreduce(&rz_local,&rz,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
 		double beta = rz / old_rz;
 
