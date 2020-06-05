@@ -310,7 +310,7 @@ void cg_solve_mpi(const struct csr_matrix_t *A, const double *b, double *x, cons
 	double erreur_local=dot(taille_loc,r_local,r_local);
 	double erreur=0.0;
 	MPI_Allreduce(&erreur_local,&erreur,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
-	double erreur=sqrt(erreur);
+  erreur=sqrt(erreur);
 
 	double start = wtime();
 	double last_display = start;
